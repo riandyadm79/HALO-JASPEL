@@ -1,0 +1,6 @@
+{
+  "name": "HALO JASPEL",
+  "description": "Sistem Manajemen Alokasi Jasa Pelayanan Rumah Sakit dan BLUD dengan Database Manajer, Matrix RBAC, Supabase RLS, Push/Pull Storage dan Ekspor/Impor Multi-Format.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

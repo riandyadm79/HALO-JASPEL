@@ -1,0 +1,646 @@
+import React, { useState } from 'react';
+import { 
+  ShieldCheck, 
+  Users, 
+  Key, 
+  Lock, 
+  Check, 
+  X, 
+  UserPlus, 
+  Edit3, 
+  Trash2, 
+  Search, 
+  ShieldAlert,
+  Sliders,
+  CheckCircle2,
+  Sparkles,
+  Info
+} from 'lucide-react';
+import { User, Permission, RoleType } from '../types';
+import { INSTALASI_LAYANAN_LIST } from '../data/initialData';
+
+interface RbacMatrixManagerProps {
+  users: User[];
+  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
+  permissions: Permission[];
+  setPermissions: React.Dispatch<React.SetStateAction<Permission[]>>;
+  currentUser: User;
+  onSelectUser: (user: User) => void;
+}
+
+export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
+  users,
+  setUsers,
+  permissions,
+  setPermissions,
+  currentUser,
+  onSelectUser
+}) => {
+  const [activeTab, setActiveTab] = useState<'matrix' | 'users'>('matrix');
+  const [searchUser, setSearchUser] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  
+  // User Modal State
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userForm, setUserForm] = useState<Omit<User, 'id'>>({
+    username: '',
+    nama: '',
+    nip: '',
+    role: 'staf',
+    unit: 'Instalasi Rawat Jalan',
+    jabatan: 'Staf Medis',
+    email: '',
+    status: 'aktif',
+    bank: 'Bank Jatim',
+    rekening: '',
+    npwp: ''
+  });
+
+  const canManageUsers = (currentUser?.role || 'staf') === 'superadmin';
+
+  const roleMeta: Record<RoleType, { label: string; desc: string; color: string }> = {
+    superadmin: {
+      label: 'Superadmin',
+      desc: 'Kendali penuh seluruh modul, bypass RLS, manajemen pengguna & database',
+      color: 'bg-blue-950 text-blue-300 border-blue-800'
+    },
+    perumus: {
+      label: 'Tim Perumus',
+      desc: 'Formulasi rumus jaspel, pagu anggaran, proporsi, simulasi & ekspor laporan',
+      color: 'bg-amber-950 text-amber-300 border-amber-800'
+    },
+    pic: {
+      label: 'PIC (Kepala Unit)',
+      desc: 'Validasi kinerja unit, pengajuan koreksi poin staf, verifikasi alokasi unit',
+      color: 'bg-blue-950 text-blue-300 border-blue-800'
+    },
+    staf: {
+      label: 'Staf / Penerima',
+      desc: 'Transparansi slip jaspel pribadi, rincian skor poin, unduh PDF slip gaji',
+      color: 'bg-slate-800 text-slate-300 border-slate-700'
+    }
+  };
+
+  const categories = Array.from(new Set(permissions.map(p => p.category)));
+
+  const filteredPermissions = permissions.filter(p => {
+    return selectedCategory === 'all' || p.category === selectedCategory;
+  });
+
+  const filteredUsers = users.filter(u => 
+    u.nama.toLowerCase().includes(searchUser.toLowerCase()) ||
+    u.nip.includes(searchUser) ||
+    u.unit.toLowerCase().includes(searchUser.toLowerCase()) ||
+    (u.role || '').toLowerCase().includes(searchUser.toLowerCase())
+  );
+
+  const togglePermission = (permId: string, role: RoleType) => {
+    if (!canManageUsers) return;
+    setPermissions(permissions.map(p => {
+      if (p.id === permId) {
+        return {
+          ...p,
+          [role]: !p[role]
+        };
+      }
+      return p;
+    }));
+  };
+
+  // Handlers for User CRUD
+  const handleOpenAddUser = () => {
+    setEditingUser(null);
+    setUserForm({
+      username: '',
+      nama: '',
+      nip: '',
+      role: 'staf',
+      unit: 'Instalasi Gawat Darurat (IGD)',
+      jabatan: 'Perawat Pelaksana',
+      email: '',
+      status: 'aktif',
+      bank: 'Bank Jatim / BPD',
+      rekening: '0019283746',
+      npwp: '01.234.567.8-091.000'
+    });
+    setShowUserModal(true);
+  };
+
+  const handleOpenEditUser = (u: User) => {
+    setEditingUser(u);
+    setUserForm({
+      username: u.username,
+      nama: u.nama,
+      nip: u.nip,
+      role: u.role,
+      unit: u.unit,
+      jabatan: u.jabatan,
+      email: u.email,
+      status: u.status,
+      bank: u.bank || 'Bank Jatim',
+      rekening: u.rekening || '',
+      npwp: u.npwp || ''
+    });
+    setShowUserModal(true);
+  };
+
+  const handleSaveUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingUser) {
+      setUsers(users.map(u => u.id === editingUser.id ? { ...userForm, id: u.id } : u));
+    } else {
+      setUsers([...users, { ...userForm, id: `u-${Date.now()}` }]);
+    }
+    setShowUserModal(false);
+  };
+
+  const handleDeleteUser = (id: string) => {
+    if (id === currentUser.id) {
+      alert('Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif.');
+      return;
+    }
+    if (confirm('Hapus pengguna ini dari sistem RBAC?')) {
+      setUsers(users.filter(u => u.id !== id));
+    }
+  };
+
+  const handleToggleStatus = (u: User) => {
+    if (!canManageUsers) return;
+    const newStatus = u.status === 'aktif' ? 'nonaktif' : 'aktif';
+    setUsers(users.map(item => item.id === u.id ? { ...item, status: newStatus } : item));
+  };
+
+  return (
+    <div className="space-y-6 pb-20 lg:pb-8">
+      
+      {/* Top Banner */}
+      <div className="bg-gradient-to-r from-[#172554] via-[#0f1d38] to-[#1e3a8a] rounded-3xl p-5 sm:p-7 border border-blue-700/50 shadow-2xl relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                RBAC MATRIX & USER ACCESS
+              </span>
+              <span className="text-xs text-blue-200 font-medium">Role-Based Access Control</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+              Matrix 4 Role Inti & Manajemen Akun Pegawai
+            </h2>
+            <p className="text-xs sm:text-sm text-blue-200/80 max-w-2xl mt-1">
+              Superadmin, Tim Perumus, PIC (Kepala Unit), dan Staf/Penerima dengan pembatasan hak akses berbasis Supabase RLS policies.
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            {canManageUsers && (
+              <button
+                onClick={handleOpenAddUser}
+                className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow transition"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Tambah Pengguna</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 4 Roles Overview Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-6 pt-6 border-t border-blue-900/60">
+          {(['superadmin', 'perumus', 'pic', 'staf'] as RoleType[]).map(roleKey => {
+            const meta = roleMeta[roleKey];
+            const count = users.filter(u => u.role === roleKey).length;
+            const isMyRole = (currentUser?.role || 'staf') === roleKey;
+
+            return (
+              <div 
+                key={roleKey}
+                className={`p-4 rounded-2xl border transition-all ${
+                  isMyRole 
+                    ? 'bg-gradient-to-br from-blue-900/80 to-[#0b142b] border-blue-400 shadow-lg shadow-blue-950/50' 
+                    : 'bg-[#0b142b]/80 border-blue-900/60 hover:border-blue-700'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${meta.color}`}>
+                    {meta.label}
+                  </span>
+                  <span className="text-xs text-blue-300 font-bold">{count} Akun</span>
+                </div>
+                <p className="text-xs text-blue-100/90 mt-2 font-medium leading-snug">
+                  {meta.desc}
+                </p>
+                {isMyRole && (
+                  <div className="mt-3 text-[10px] text-amber-300 font-bold flex items-center space-x-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Peran Anda Saat Ini</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Tab Switcher: Matrix vs User Management */}
+      <div className="bg-slate-900/90 rounded-3xl border border-slate-800 p-4 sm:p-6 shadow-xl space-y-6">
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="flex items-center space-x-1 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+            <button
+              onClick={() => setActiveTab('matrix')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+                activeTab === 'matrix'
+                  ? 'bg-gradient-to-r from-blue-700 to-blue-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span>Matrix Hak Akses</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+                activeTab === 'users'
+                  ? 'bg-gradient-to-r from-blue-700 to-blue-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Daftar Pengguna ({users.length})</span>
+            </button>
+          </div>
+
+          {activeTab === 'matrix' ? (
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-slate-400 font-medium">Filter Kategori:</span>
+              <select
+                value={selectedCategory}
+                onChange={e => setSelectedCategory(e.target.value)}
+                className="p-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white"
+              >
+                <option value="all">Semua Kategori</option>
+                {categories.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchUser}
+                onChange={e => setSearchUser(e.target.value)}
+                placeholder="Cari nama, NIP, unit..."
+                className="w-full pl-9 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* 1. MATRIX VIEW */}
+        {activeTab === 'matrix' && (
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-400 flex items-start space-x-2.5">
+              <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-slate-200 font-bold">Matriks Izin Berbasis Role-Based Access Control</p>
+                <p className="text-[11px] mt-0.5">
+                  {canManageUsers 
+                    ? 'Sebagai Superadmin, Anda dapat mencentang atau mematikan izin fitur secara langsung di tabel bawah ini.'
+                    : 'Tampilan hak akses terhubung dengan Supabase RLS. Hanya Superadmin yang dapat mengubah kebijakan matriks.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-800">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="py-3.5 px-4 w-1/3">Fitur / Hak Akses</th>
+                    <th className="py-3.5 px-3">Kategori</th>
+                    <th className="py-3.5 px-3 text-center text-rose-300">Superadmin</th>
+                    <th className="py-3.5 px-3 text-center text-amber-300">Tim Perumus</th>
+                    <th className="py-3.5 px-3 text-center text-blue-300">PIC (Unit)</th>
+                    <th className="py-3.5 px-3 text-center text-slate-300">Staf / Penerima</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                  {filteredPermissions.map(p => (
+                    <tr key={p.id} className="hover:bg-slate-800/40 transition">
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-white text-xs sm:text-sm">{p.name}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{p.description}</div>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 border border-slate-700 text-slate-300">
+                          {p.category}
+                        </span>
+                      </td>
+
+                      {/* Superadmin Checkbox */}
+                      <td className="py-3.5 px-3 text-center">
+                        <button
+                          disabled={!canManageUsers}
+                          onClick={() => togglePermission(p.id, 'superadmin')}
+                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition ${
+                            p.superadmin 
+                              ? 'bg-rose-950 border border-rose-700 text-rose-300' 
+                              : 'bg-slate-800/50 text-slate-600'
+                          } ${canManageUsers ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
+                        >
+                          {p.superadmin ? <Check className="w-4 h-4 font-bold" /> : <X className="w-3.5 h-3.5" />}
+                        </button>
+                      </td>
+
+                      {/* Tim Perumus Checkbox */}
+                      <td className="py-3.5 px-3 text-center">
+                        <button
+                          disabled={!canManageUsers}
+                          onClick={() => togglePermission(p.id, 'perumus')}
+                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition ${
+                            p.perumus 
+                              ? 'bg-amber-950 border border-amber-700 text-amber-300' 
+                              : 'bg-slate-800/50 text-slate-600'
+                          } ${canManageUsers ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
+                        >
+                          {p.perumus ? <Check className="w-4 h-4 font-bold" /> : <X className="w-3.5 h-3.5" />}
+                        </button>
+                      </td>
+
+                      {/* PIC Unit Checkbox */}
+                      <td className="py-3.5 px-3 text-center">
+                        <button
+                          disabled={!canManageUsers}
+                          onClick={() => togglePermission(p.id, 'pic')}
+                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition ${
+                            p.pic 
+                              ? 'bg-blue-950 border border-blue-700 text-blue-300' 
+                              : 'bg-slate-800/50 text-slate-600'
+                          } ${canManageUsers ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
+                        >
+                          {p.pic ? <Check className="w-4 h-4 font-bold" /> : <X className="w-3.5 h-3.5" />}
+                        </button>
+                      </td>
+
+                      {/* Staf Checkbox */}
+                      <td className="py-3.5 px-3 text-center">
+                        <button
+                          disabled={!canManageUsers}
+                          onClick={() => togglePermission(p.id, 'staf')}
+                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition ${
+                            p.staf 
+                              ? 'bg-emerald-950 border border-emerald-700 text-emerald-300' 
+                              : 'bg-slate-800/50 text-slate-600'
+                          } ${canManageUsers ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
+                        >
+                          {p.staf ? <Check className="w-4 h-4 font-bold" /> : <X className="w-3.5 h-3.5" />}
+                        </button>
+                      </td>
+
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 2. USERS LIST VIEW */}
+        {activeTab === 'users' && (
+          <div className="space-y-4">
+            <div className="overflow-x-auto rounded-2xl border border-slate-800">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="py-3.5 px-4">Nama Lengkap & Akun</th>
+                    <th className="py-3.5 px-3">Unit Kerja & Jabatan</th>
+                    <th className="py-3.5 px-3 text-center">Peran (Role)</th>
+                    <th className="py-3.5 px-3">Rekening Payroll</th>
+                    <th className="py-3.5 px-3 text-center">Status Akun</th>
+                    <th className="py-3.5 px-3 text-center">Aksi Persona</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                  {filteredUsers.map(u => (
+                    <tr key={u.id} className="hover:bg-slate-800/40 transition">
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center space-x-2.5">
+                          <div className={`w-8 h-8 rounded-xl font-bold flex items-center justify-center text-xs ${
+                            u.role === 'superadmin' ? 'bg-rose-950 text-rose-300 border border-rose-800' :
+                            u.role === 'perumus' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                            u.role === 'pic' ? 'bg-blue-950 text-blue-300 border border-blue-800' :
+                            'bg-slate-800 text-slate-300'
+                          }`}>
+                            {u.nama.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="font-bold text-white text-xs sm:text-sm">{u.nama}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">@{u.username} • NIP. {u.nip}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3 text-slate-300">
+                        <div>{u.unit}</div>
+                        <div className="text-[10px] text-slate-400">{u.jabatan}</div>
+                      </td>
+                      <td className="py-3.5 px-3 text-center">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${roleMeta[u.role]?.color || roleMeta.staf.color}`}>
+                          {u.role || 'staf'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 text-slate-300 font-mono text-[11px]">
+                        <div>{u.bank || 'Bank Jatim'}</div>
+                        <div className="text-[10px] text-slate-400">{u.rekening || '-'}</div>
+                      </td>
+                      <td className="py-3.5 px-3 text-center">
+                        <button
+                          onClick={() => handleToggleStatus(u)}
+                          disabled={!canManageUsers}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            u.status === 'aktif'
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                              : 'bg-slate-800 text-slate-500 border border-slate-700'
+                          }`}
+                        >
+                          {u.status.toUpperCase()}
+                        </button>
+                      </td>
+                      <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center space-x-1.5">
+                          {/* Live Persona Test Switcher */}
+                          <button
+                            onClick={() => onSelectUser(u)}
+                            className="px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-[10px] font-bold transition"
+                            title="Masuk Sebagai Persona Ini"
+                          >
+                            Uji Persona
+                          </button>
+
+                          {canManageUsers && (
+                            <>
+                              <button
+                                onClick={() => handleOpenEditUser(u)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                                title="Edit Akun"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(u.id)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
+                                title="Hapus Akun"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* USER MODAL (ADD / EDIT) */}
+      {showUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl space-y-4 my-auto max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-black text-white">
+                {editingUser ? 'Ubah Data Pengguna' : 'Tambah Pengguna RBAC Baru'}
+              </h3>
+              <button onClick={() => setShowUserModal(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveUser} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Username Akun</label>
+                  <input
+                    type="text"
+                    required
+                    value={userForm.username}
+                    onChange={e => setUserForm({ ...userForm, username: e.target.value })}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Peran Matrix (Role)</label>
+                  <select
+                    value={userForm.role}
+                    onChange={e => setUserForm({ ...userForm, role: e.target.value as any })}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-amber-300 font-bold"
+                  >
+                    <option value="superadmin">Superadmin</option>
+                    <option value="perumus">Tim Perumus</option>
+                    <option value="pic">PIC (Kepala Ruangan/Unit)</option>
+                    <option value="staf">Staf / Penerima Jaspel</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Nama Lengkap & Gelar</label>
+                <input
+                  type="text"
+                  required
+                  value={userForm.nama}
+                  onChange={e => setUserForm({ ...userForm, nama: e.target.value })}
+                  placeholder="Contoh: dr. Budi Santoso, Sp.A"
+                  className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">NIP Pegawai</label>
+                  <input
+                    type="text"
+                    required
+                    value={userForm.nip}
+                    onChange={e => setUserForm({ ...userForm, nip: e.target.value })}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Email Resmi</label>
+                  <input
+                    type="email"
+                    value={userForm.email}
+                    onChange={e => setUserForm({ ...userForm, email: e.target.value })}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Unit Kerja / Ruangan</label>
+                  <input
+                    type="text"
+                    required
+                    list="instalasi-list"
+                    value={userForm.unit}
+                    onChange={e => setUserForm({ ...userForm, unit: e.target.value })}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white"
+                    placeholder="Pilih atau ketik unit..."
+                  />
+                  <datalist id="instalasi-list">
+                    {INSTALASI_LAYANAN_LIST.map(inst => (
+                      <option key={inst} value={inst} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Jabatan</label>
+                  <input
+                    type="text"
+                    required
+                    value={userForm.jabatan}
+                    onChange={e => setUserForm({ ...userForm, jabatan: e.target.value })}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Bank Payroll</label>
+                  <input
+                    type="text"
+                    value={userForm.bank}
+                    onChange={e => setUserForm({ ...userForm, bank: e.target.value })}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">No. Rekening</label>
+                  <input
+                    type="text"
+                    value={userForm.rekening}
+                    onChange={e => setUserForm({ ...userForm, rekening: e.target.value })}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button type="button" onClick={() => setShowUserModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold">Batal</button>
+                <button type="submit" className="px-5 py-2 rounded-xl bg-amber-400 text-slate-950 font-bold hover:bg-amber-300">Simpan Akun</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};

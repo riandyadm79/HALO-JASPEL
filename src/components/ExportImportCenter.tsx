@@ -1,0 +1,424 @@
+import React, { useState } from 'react';
+import { 
+  FileSpreadsheet, 
+  Download, 
+  Upload, 
+  FileText, 
+  Check, 
+  AlertCircle, 
+  Sparkles, 
+  Copy, 
+  RefreshCw,
+  Eye,
+  FileCheck2
+} from 'lucide-react';
+import { AlokasiJaspel, PenerimaAlokasi, GeneralIndexItem, CostCenterItem, RevenueCenterItem, User } from '../types';
+import { 
+  exportToXLSX, 
+  exportDatabaseToXLSX, 
+  exportToCSV, 
+  exportToTextSummary, 
+  parseCSVFile, 
+  parseXLSXFile 
+} from '../utils/exportImport';
+import { formatRupiah, formatNumber } from '../utils/calculations';
+
+interface ExportImportCenterProps {
+  alokasiList: AlokasiJaspel[];
+  penerimaList: PenerimaAlokasi[];
+  setPenerimaList: React.Dispatch<React.SetStateAction<PenerimaAlokasi[]>>;
+  generalIndexList: GeneralIndexItem[];
+  setGeneralIndexList: React.Dispatch<React.SetStateAction<GeneralIndexItem[]>>;
+  costCenterList: CostCenterItem[];
+  revenueCenterList: RevenueCenterItem[];
+  currentUser: User;
+}
+
+export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
+  alokasiList,
+  penerimaList,
+  setPenerimaList,
+  generalIndexList,
+  setGeneralIndexList,
+  costCenterList,
+  revenueCenterList,
+  currentUser
+}) => {
+  const [selectedAlokasiId, setSelectedAlokasiId] = useState<string>(alokasiList[0]?.id || '');
+  const [textPreview, setTextPreview] = useState<string>('');
+  const [copiedText, setCopiedText] = useState(false);
+  const [importTarget, setImportTarget] = useState<'penerima' | 'generalIndex'>('penerima');
+  const [importedRows, setImportedRows] = useState<Record<string, unknown>[]>([]);
+  const [importFileName, setImportFileName] = useState<string>('');
+  const [importSuccessMessage, setImportSuccessMessage] = useState<string>('');
+
+  const selectedAlokasi = alokasiList.find(a => a.id === selectedAlokasiId) || alokasiList[0];
+  const currentPenerima = penerimaList.filter(p => p.alokasiId === selectedAlokasi?.id);
+
+  // Generate text summary on selection
+  React.useEffect(() => {
+    if (selectedAlokasi) {
+      const summary = exportToTextSummary(selectedAlokasi, currentPenerima);
+      setTextPreview(summary);
+    }
+  }, [selectedAlokasiId, alokasiList, penerimaList]);
+
+  const handleCopyText = () => {
+    navigator.clipboard.writeText(textPreview);
+    setCopiedText(true);
+    setTimeout(() => setCopiedText(false), 2000);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    setImportSuccessMessage('');
+    try {
+      if (file.name.endsWith('.csv')) {
+        const rows = await parseCSVFile(file);
+        setImportedRows(rows);
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        const rows = await parseXLSXFile(file);
+        setImportedRows(rows);
+      } else {
+        alert('Mohon gunakan file berformat .xlsx atau .csv');
+      }
+    } catch (err) {
+      alert('Gagal membaca file: ' + String(err));
+    }
+  };
+
+  const handleCommitImport = () => {
+    if (importedRows.length === 0) return;
+
+    if (importTarget === 'penerima' && selectedAlokasi) {
+      const newPenerima: PenerimaAlokasi[] = importedRows.map((row, idx) => {
+        const dasar = Number(row['Poin Dasar'] || row['poinDasar'] || 60);
+        const komp = Number(row['Poin Kompetensi'] || row['poinKompetensi'] || 60);
+        const risiko = Number(row['Poin Risiko'] || row['poinRisiko'] || 60);
+        const kinerja = Number(row['Poin Kinerja'] || row['poinKinerja'] || 75);
+        const total = dasar + komp + risiko + kinerja;
+        const perPoin = Number(row['Nilai Per Poin (Rp)'] || row['nilaiPerPoin'] || 36000);
+        const bruto = total * perPoin;
+        const pajakRate = Number(row['PPh 21 (%)'] || row['pajakPph21Persen'] || 5);
+        const potongan = Math.round(bruto * (pajakRate / 100));
+        const netto = bruto - potongan;
+
+        return {
+          id: `pen-imp-${Date.now()}-${idx}`,
+          alokasiId: selectedAlokasi.id,
+          pegawaiId: `peg-imp-${idx}`,
+          nama: String(row['Nama Pegawai'] || row['nama'] || `Staf Impor ${idx + 1}`),
+          unitKerja: String(row['Unit Kerja'] || row['unitKerja'] || 'Instalasi Gawat Darurat (IGD)'),
+          jabatan: String(row['Jabatan'] || row['jabatan'] || 'Staf Pelaksana'),
+          kategori: (row['Kategori'] || 'Keperawatan') as any,
+          poinDasar: dasar,
+          poinKompetensi: komp,
+          poinRisiko: risiko,
+          poinKinerja: kinerja,
+          totalPoin: total,
+          nilaiPerPoin: perPoin,
+          brutoJaspel: bruto,
+          pajakPph21Persen: pajakRate,
+          potonganPph21: potongan,
+          nettoDiterima: netto,
+          statusKoreksi: 'Sesuai',
+          sudahDibayar: false
+        };
+      });
+
+      setPenerimaList([...penerimaList, ...newPenerima]);
+      setImportSuccessMessage(`Berhasil mengimpor ${newPenerima.length} baris staf ke periode ${selectedAlokasi.bulan} ${selectedAlokasi.tahun}!`);
+      setImportedRows([]);
+      setImportFileName('');
+    } else if (importTarget === 'generalIndex') {
+      const newGeneral: GeneralIndexItem[] = importedRows.map((row, idx) => ({
+        id: `idx-imp-${Date.now()}-${idx}`,
+        kode: String(row['Kode'] || row['kode'] || `GI-${idx + 100}`),
+        namaPegawai: String(row['Nama Pegawai'] || row['namaPegawai'] || `Pegawai ${idx + 1}`),
+        nip: String(row['NIP'] || row['nip'] || `19900000000000000${idx}`),
+        unitKerja: String(row['Unit Kerja'] || row['unitKerja'] || 'Instalasi Rawat Jalan'),
+        golongan: String(row['Golongan'] || row['golongan'] || 'III/b'),
+        pendidikan: (row['Pendidikan'] || 'D4 / S1') as any,
+        masaKerjaTahun: Number(row['Masa Kerja'] || row['masaKerjaTahun'] || 8),
+        skorDasar: Number(row['Skor Dasar'] || row['skorDasar'] || 70),
+        skorKompetensi: Number(row['Skor Kompetensi'] || row['skorKompetensi'] || 70),
+        skorRisiko: Number(row['Skor Risiko'] || row['skorRisiko'] || 70),
+        skorKinerja: Number(row['Skor Kinerja'] || row['skorKinerja'] || 80),
+        bobotPresensi: Number(row['Presensi'] || row['bobotPresensi'] || 98),
+        statusPegawai: (row['Status Pegawai'] || 'PNS') as any
+      }));
+
+      setGeneralIndexList([...generalIndexList, ...newGeneral]);
+      setImportSuccessMessage(`Berhasil mengimpor ${newGeneral.length} pegawai ke master General Index!`);
+      setImportedRows([]);
+      setImportFileName('');
+    }
+  };
+
+  return (
+    <div className="space-y-6 pb-20 lg:pb-8">
+      
+      {/* Banner */}
+      <div className="bg-gradient-to-r from-[#172554] via-[#0f1d38] to-[#1e3a8a] rounded-3xl p-5 sm:p-7 border border-blue-700/50 shadow-2xl relative overflow-hidden">
+        <div>
+          <div className="flex items-center space-x-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-400/20 text-amber-300 border border-amber-400/30">
+              MULTI-FORMAT EXPORT & IMPORT
+            </span>
+            <span className="text-xs text-blue-200 font-medium">XLSX • CSV • TEXT • PDF</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+            Pusat Ekspor & Impor Data Jasa Pelayanan
+          </h2>
+          <p className="text-xs sm:text-sm text-blue-200/80 max-w-2xl mt-1">
+            Ekspor laporan remunerasi resmi ke Excel, CSV data pipeline, plain-text format dot-matrix / WhatsApp blast, serta impor spreadsheet massal.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* LEFT COLUMN: EXPORT OPTIONS */}
+        <div className="bg-slate-900/90 rounded-3xl border border-slate-800 p-5 sm:p-6 shadow-xl space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center space-x-2 text-white">
+              <Download className="w-5 h-5 text-amber-400" />
+              <h3 className="text-base font-black">Ekspor Data Multi-Format</h3>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-slate-400 text-xs font-bold uppercase mb-1">
+                Pilih Periode Alokasi
+              </label>
+              <select
+                value={selectedAlokasiId}
+                onChange={e => setSelectedAlokasiId(e.target.value)}
+                className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white"
+              >
+                {alokasiList.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.kodePeriode} — {a.bulan} {a.tahun} ({a.status})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Quick Export Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              
+              {/* XLSX Card */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/50 transition space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-400 uppercase">1. FORMAT XLSX</span>
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Worksheet Excel lengkap dengan 2 sheet: Ringkasan Alokasi & Rincian Penerima
+                </p>
+                <button
+                  onClick={() => selectedAlokasi && exportToXLSX(selectedAlokasi, currentPenerima)}
+                  className="w-full py-2 px-3 rounded-xl bg-emerald-950 hover:bg-emerald-900 text-emerald-300 font-bold text-xs border border-emerald-800 transition flex items-center justify-center space-x-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh XLSX</span>
+                </button>
+              </div>
+
+              {/* CSV Card */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-amber-500/50 transition space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-amber-400 uppercase">2. FORMAT CSV</span>
+                  <FileSpreadsheet className="w-5 h-5 text-amber-400" />
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  File CSV standar UTF-8 untuk integrasi ke SIMRS, payroll bank, atau aplikasi eksternal
+                </p>
+                <button
+                  onClick={() => selectedAlokasi && exportToCSV(currentPenerima as any, `HALO_JASPEL_${selectedAlokasi.kodePeriode}`)}
+                  className="w-full py-2 px-3 rounded-xl bg-amber-950 hover:bg-amber-900 text-amber-300 font-bold text-xs border border-amber-800 transition flex items-center justify-center space-x-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh CSV</span>
+                </button>
+              </div>
+
+              {/* Database Master XLSX */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-blue-500/50 transition space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-blue-400 uppercase">3. MASTER DB XLSX</span>
+                  <FileSpreadsheet className="w-5 h-5 text-blue-400" />
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Arsip seluruh data General Index, Cost Center & Revenue Center dalam satu file
+                </p>
+                <button
+                  onClick={() => exportDatabaseToXLSX(generalIndexList, costCenterList, revenueCenterList)}
+                  className="w-full py-2 px-3 rounded-xl bg-blue-950 hover:bg-blue-900 text-blue-300 font-bold text-xs border border-blue-800 transition flex items-center justify-center space-x-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh Master DB</span>
+                </button>
+              </div>
+
+              {/* Text Summary */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-indigo-500/50 transition space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-indigo-400 uppercase">4. FORMAT PLAIN TEXT</span>
+                  <FileText className="w-5 h-5 text-indigo-400" />
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Format teks tabular ringkas siap cetak dot-matrix atau copy paste ke WhatsApp
+                </p>
+                <button
+                  onClick={handleCopyText}
+                  className="w-full py-2 px-3 rounded-xl bg-blue-950 hover:bg-blue-900 text-amber-300 font-bold text-xs border border-blue-800 transition flex items-center justify-center space-x-1.5"
+                >
+                  {copiedText ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedText ? 'Tersalin!' : 'Salin Teks Ringkasan'}</span>
+                </button>
+              </div>
+
+            </div>
+
+            {/* Plain Text Preview Area */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase">
+                  Pratinjau Teks Laporan
+                </span>
+                <button
+                  onClick={handleCopyText}
+                  className="text-xs text-amber-400 hover:underline flex items-center space-x-1"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>{copiedText ? 'Tersalin' : 'Salin Semua'}</span>
+                </button>
+              </div>
+              <textarea
+                readOnly
+                rows={7}
+                value={textPreview}
+                className="w-full p-3 bg-black border border-slate-800 rounded-2xl font-mono text-[11px] text-emerald-400 custom-scrollbar"
+              />
+            </div>
+
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: MASS IMPORT PARSER */}
+        <div className="bg-slate-900/90 rounded-3xl border border-slate-800 p-5 sm:p-6 shadow-xl space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center space-x-2 text-white">
+              <Upload className="w-5 h-5 text-amber-400" />
+              <h3 className="text-base font-black">Impor Data Massal (Spreadsheet)</h3>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-slate-400 text-xs font-bold uppercase mb-1">
+                Target Tabel Impor
+              </label>
+              <select
+                value={importTarget}
+                onChange={e => setImportTarget(e.target.value as any)}
+                className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white font-bold"
+              >
+                <option value="penerima">Rincian Penerima Alokasi (Periode Aktif)</option>
+                <option value="generalIndex">Database Master General Index Pegawai</option>
+              </select>
+            </div>
+
+            {/* Drag & Drop Input Zone */}
+            <div className="p-6 rounded-2xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-amber-400 transition text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-amber-400">
+                <FileSpreadsheet className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white">
+                  Pilih file spreadsheet (.XLSX atau .CSV)
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Kolom akan dipetakan otomatis sesuai header
+                </p>
+              </div>
+
+              <div>
+                <label className="cursor-pointer inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow transition active:scale-95">
+                  <Upload className="w-4 h-4" />
+                  <span>Pilih Berkas Komputer</span>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {importFileName && (
+                <div className="text-xs font-mono text-emerald-400 font-bold pt-2">
+                  Berkas terbaca: {importFileName} ({importedRows.length} baris)
+                </div>
+              )}
+            </div>
+
+            {/* Notification alert */}
+            {importSuccessMessage && (
+              <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs font-bold flex items-center space-x-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{importSuccessMessage}</span>
+              </div>
+            )}
+
+            {/* Preview of Imported Data */}
+            {importedRows.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300">
+                    Pratinjau Data Impor ({importedRows.length} baris)
+                  </span>
+                  <button
+                    onClick={handleCommitImport}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-slate-950 font-black text-xs shadow"
+                  >
+                    Konfirmasi & Masukkan Data
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-800 max-h-48 custom-scrollbar">
+                  <table className="w-full text-left border-collapse text-[11px]">
+                    <thead className="bg-slate-950 text-slate-400">
+                      <tr>
+                        {Object.keys(importedRows[0]).slice(0, 5).map(k => (
+                          <th key={k} className="p-2 whitespace-nowrap">{k}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-slate-300">
+                      {importedRows.slice(0, 5).map((row, i) => (
+                        <tr key={i}>
+                          {Object.values(row).slice(0, 5).map((v: any, j) => (
+                            <td key={j} className="p-2 whitespace-nowrap font-mono">{String(v)}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  );
+};

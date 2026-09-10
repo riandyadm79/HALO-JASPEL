@@ -1,0 +1,343 @@
+@import "tailwindcss";
+
+/* ========================================================
+   LIGHT THEME SYSTEM FOR HALO JASPEL
+   (Activated when [data-theme="light"] or .light is on <html>)
+   Dark Theme is the default / preserved Executive Navy Theme.
+   ======================================================== */
+
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Base Body & Root Canvas */
+[data-theme="light"] body,
+[data-theme="light"] .app-root,
+html[data-theme="light"] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .bg-\[\#07090e\] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Top Navbar in Light Mode */
+[data-theme="light"] header.bg-\[\#0c1633\] {
+  background-color: #ffffff !important;
+  border-bottom-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] header.bg-\[\#0c1633\] h1 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] header.bg-\[\#0c1633\] p {
+  color: #64748b !important;
+}
+
+[data-theme="light"] header.bg-\[\#0c1633\] .bg-blue-900\/80 {
+  background-color: #dbeafe !important;
+  color: #1e40af !important;
+  border-color: #bfdbfe !important;
+}
+
+[data-theme="light"] header.bg-\[\#0c1633\] .bg-blue-950\/60 {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] header.bg-\[\#0c1633\] .bg-blue-950\/60 span.text-white {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] header.bg-\[\#0c1633\] .bg-gradient-to-r.from-blue-950.to-slate-900 {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] header.bg-\[\#0c1633\] .bg-gradient-to-r.from-blue-950.to-slate-900 p.text-white {
+  color: #0f172a !important;
+}
+
+/* User Switcher Dropdown */
+[data-theme="light"] .bg-\[\#0f1d38\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Sidebar in Light Mode */
+[data-theme="light"] aside {
+  background-color: #ffffff !important;
+  border-right-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] aside button.bg-blue-600,
+[data-theme="light"] aside button.bg-blue-600 * {
+  color: #ffffff !important;
+}
+
+[data-theme="light"] aside button.bg-gradient-to-r,
+[data-theme="light"] aside button.bg-gradient-to-r * {
+  color: #ffffff !important;
+}
+
+/* Main Dashboard Cards & Panels */
+[data-theme="light"] .bg-slate-900,
+[data-theme="light"] .bg-slate-900\/90,
+[data-theme="light"] .bg-slate-900\/80,
+[data-theme="light"] .bg-slate-900\/60,
+[data-theme="light"] .bg-slate-900\/40 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="light"] .bg-slate-950,
+[data-theme="light"] .bg-slate-950\/90,
+[data-theme="light"] .bg-slate-950\/80,
+[data-theme="light"] .bg-slate-950\/60 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .bg-\[\#0b142b\],
+[data-theme="light"] .bg-\[\#0b142b\]\/80 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Blue-tinted card surfaces */
+[data-theme="light"] .bg-blue-950,
+[data-theme="light"] .bg-blue-950\/90,
+[data-theme="light"] .bg-blue-950\/80,
+[data-theme="light"] .bg-blue-950\/60,
+[data-theme="light"] .bg-blue-950\/50,
+[data-theme="light"] .bg-blue-950\/40 {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+[data-theme="light"] .bg-slate-800,
+[data-theme="light"] .bg-slate-800\/90,
+[data-theme="light"] .bg-slate-800\/80,
+[data-theme="light"] .bg-slate-800\/60,
+[data-theme="light"] .bg-slate-800\/40 {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Executive Banners in Light Mode */
+[data-theme="light"] .bg-gradient-to-r.from-\[\#172554\].via-\[\#0f1d38\].to-\[\#1e3a8a\] {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #1e40af 100%) !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 10px 25px -5px rgba(30, 58, 138, 0.25) !important;
+}
+
+[data-theme="light"] .bg-gradient-to-r.from-\[\#172554\].via-\[\#0f1d38\].to-\[\#1e3a8a\] h2 {
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .bg-gradient-to-r.from-\[\#172554\].via-\[\#0f1d38\].to-\[\#1e3a8a\] p {
+  color: #dbeafe !important;
+}
+
+/* Quick Stats Card in Alokasi Manager */
+[data-theme="light"] .bg-\[\#0b142b\]\/80 span.text-blue-300 {
+  color: #2563eb !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .bg-\[\#0b142b\]\/80 p.text-white {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .bg-\[\#0b142b\]\/80 span.text-blue-300\/70 {
+  color: #64748b !important;
+}
+
+/* Inputs, Textareas, and Form Selects */
+[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]):focus,
+[data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15) !important;
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* General Text Contrast in Light Mode */
+[data-theme="light"] h1:not(.bg-gradient-to-r *),
+[data-theme="light"] h2:not(.bg-gradient-to-r *),
+[data-theme="light"] h3:not(.bg-gradient-to-r *),
+[data-theme="light"] h4:not(.bg-gradient-to-r *) {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .text-white:not(button.bg-blue-600 *):not(button.bg-blue-700 *):not(button.bg-emerald-600 *):not(button.bg-rose-600 *):not(.bg-gradient-to-r *):not(.bg-blue-600 *):not(.bg-blue-700 *) {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .text-slate-100,
+[data-theme="light"] .text-slate-200 {
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .text-slate-300 {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .text-slate-400 {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .text-blue-100,
+[data-theme="light"] .text-blue-200,
+[data-theme="light"] .text-blue-200\/70,
+[data-theme="light"] .text-blue-200\/80 {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .text-blue-300 {
+  color: #1d4ed8 !important;
+}
+
+[data-theme="light"] .text-amber-400 {
+  color: #b45309 !important;
+}
+
+/* Buttons in Light Mode */
+[data-theme="light"] button.bg-amber-400 {
+  background-color: #f59e0b !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] button.bg-amber-400:hover {
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+}
+
+/* Borders */
+[data-theme="light"] .border-slate-800,
+[data-theme="light"] .border-slate-700,
+[data-theme="light"] .border-slate-600,
+[data-theme="light"] .border-blue-900\/40,
+[data-theme="light"] .border-blue-900\/50,
+[data-theme="light"] .border-blue-900\/60,
+[data-theme="light"] .border-blue-900\/80,
+[data-theme="light"] .border-blue-800,
+[data-theme="light"] .border-blue-800\/60,
+[data-theme="light"] .border-blue-800\/70,
+[data-theme="light"] .border-blue-800\/80 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Tables in Light Mode */
+[data-theme="light"] table {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] thead {
+  background-color: #f1f5f9 !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] thead th {
+  color: #475569 !important;
+  font-weight: 800 !important;
+}
+
+[data-theme="light"] tbody tr {
+  border-color: #e2e8f0 !important;
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+[data-theme="light"] tbody td {
+  color: #1e293b !important;
+}
+
+[data-theme="light"] tbody td .text-white {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] tbody td .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* Modals in Light Mode */
+[data-theme="light"] .fixed.inset-0.bg-black\/80,
+[data-theme="light"] .fixed.inset-0.bg-black\/75,
+[data-theme="light"] .fixed.inset-0.bg-black\/70 {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+[data-theme="light"] .fixed .bg-slate-900,
+[data-theme="light"] .fixed .bg-\[\#0c1633\],
+[data-theme="light"] .fixed .bg-\[\#0f1d38\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.18) !important;
+  color: #0f172a !important;
+}
+
+/* Mobile Nav bottom bar in Light Mode */
+[data-theme="light"] nav.bg-\[\#0c1633\] {
+  background-color: #ffffff !important;
+  border-top-color: #e2e8f0 !important;
+  box-shadow: 0 -4px 15px -3px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] nav.bg-\[\#0c1633\] .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* Badges and Chips in Light Mode */
+[data-theme="light"] .bg-blue-950.text-blue-300 {
+  background-color: #dbeafe !important;
+  color: #1e40af !important;
+  border-color: #bfdbfe !important;
+}
+
+[data-theme="light"] .bg-emerald-950.text-emerald-300 {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+  border-color: #a7f3d0 !important;
+}
+
+[data-theme="light"] .bg-amber-950.text-amber-300 {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+  border-color: #fde68a !important;
+}
+
+[data-theme="light"] .bg-rose-950.text-rose-300 {
+  background-color: #ffe4e6 !important;
+  color: #9f1239 !important;
+  border-color: #fecdd3 !important;
+}
+
+[data-theme="light"] .bg-indigo-950.text-indigo-300 {
+  background-color: #e0e7ff !important;
+  color: #3730a3 !important;
+  border-color: #c7d2fe !important;
+}
