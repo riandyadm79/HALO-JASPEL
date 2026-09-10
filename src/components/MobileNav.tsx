@@ -10,7 +10,8 @@ import {
   ChevronRight,
   Filter,
   Sun,
-  Moon
+  Moon,
+  TrendingUp
 } from 'lucide-react';
 import { RoleType, User } from '../types';
 import { INSTALASI_LAYANAN_LIST } from '../data/initialData';
@@ -45,6 +46,12 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       id: 'alokasi',
       label: 'Alokasi Jaspel',
       icon: Calculator,
+      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[]
+    },
+    {
+      id: 'visualisasi',
+      label: 'Visualisasi Tren',
+      icon: TrendingUp,
       roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[]
     },
     {

@@ -33,6 +33,7 @@ import { SupabaseSyncManager } from './components/SupabaseSyncManager';
 import { ExportImportCenter } from './components/ExportImportCenter';
 import { SimulasiKalkulator } from './components/SimulasiKalkulator';
 import { SlipJaspelModal } from './components/SlipJaspelModal';
+import { VisualisasiDashboard } from './components/VisualisasiDashboard';
 import { formatRupiah } from './utils/calculations';
 import { FileText, Sparkles, Check, Download } from 'lucide-react';
 
@@ -327,6 +328,17 @@ export function App() {
               setGeneralIndexList={setGeneralIndexList}
               costCenterList={costCenterList}
               revenueCenterList={revenueCenterList}
+              currentUser={currentUser}
+            />
+          )}
+
+          {/* TAB 7: VISUALISASI DASHBOARD */}
+          {activeTab === 'visualisasi' && (
+            <VisualisasiDashboard
+              alokasiList={alokasiList}
+              costCenterList={costCenterList}
+              revenueCenterList={revenueCenterList}
+              penerimaList={penerimaList}
               currentUser={currentUser}
             />
           )}

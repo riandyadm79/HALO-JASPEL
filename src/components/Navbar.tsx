@@ -32,9 +32,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   users,
   onSelectUser,
+  activeTab,
+  setActiveTab,
   rlsEnabled,
   onOpenSyncModal,
-  onToggleMobileMenu
+  onToggleMobileMenu,
+  isMobileMenuOpen
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
