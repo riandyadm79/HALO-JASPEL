@@ -205,9 +205,14 @@ export function App() {
 
   // Auto-push to Supabase whenever changes are made & saved
   const isInitialMount = React.useRef(true);
+  const isFetchingRef = React.useRef(false);
+
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      return;
+    }
+    if (isFetchingRef.current) {
       return;
     }
     const timer = setTimeout(async () => {
@@ -225,7 +230,7 @@ export function App() {
       } catch (err) {
         console.warn('Background auto-push notice:', err);
       }
-    }, 1500);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [alokasiList, penerimaList, generalIndexList, costCenterList, revenueCenterList, indeksJasaList, users, hospitalProfile]);
@@ -284,130 +289,43 @@ export function App() {
   }, []);
 
   const fetchData = async () => {
+    isFetchingRef.current = true;
     setIsLoading(true);
     try {
-      const [
-        { data: alokasi, error: alokasiErr },
-        { data: penerima, error: penerimaErr },
-        { data: genIdx, error: genIdxErr },
-        { data: cost, error: costErr },
-        { data: revenue, error: revErr },
-        { data: ijlData, error: ijlErr },
-        { data: usr, error: usrErr },
-        { data: hospData, error: hospErr }
-      ] = await Promise.all([
-        supabase.from('alokasi_jaspel').select('*'),
-        supabase.from('penerima_alokasi').select('*'),
-        supabase.from('general_index').select('*'),
-        supabase.from('cost_center').select('*'),
-        supabase.from('revenue_center').select('*'),
-        supabase.from('indeks_jasa_langsung').select('*'),
-        supabase.from('users_rbac').select('*'),
-        supabase.from('hospital_profile').select('*').limit(1).maybeSingle()
-      ]);
-
-      if (hospData) {
-        setHospitalProfile({
-          badgeText: hospData.badge_text || DEFAULT_HOSPITAL_PROFILE.badgeText,
-          badgeColor: hospData.badge_color || DEFAULT_HOSPITAL_PROFILE.badgeColor,
-          hospitalName: hospData.hospital_name || DEFAULT_HOSPITAL_PROFILE.hospitalName,
-          subtitle: hospData.subtitle || DEFAULT_HOSPITAL_PROFILE.subtitle,
-          hospitalType: hospData.hospital_type || DEFAULT_HOSPITAL_PROFILE.hospitalType,
-          pemdaName: hospData.pemda_name || DEFAULT_HOSPITAL_PROFILE.pemdaName,
-          address: hospData.address || DEFAULT_HOSPITAL_PROFILE.address,
-          city: hospData.city || DEFAULT_HOSPITAL_PROFILE.city,
-          phone: hospData.phone || DEFAULT_HOSPITAL_PROFILE.phone,
-          directorName: hospData.director_name || DEFAULT_HOSPITAL_PROFILE.directorName,
-          directorNip: hospData.director_nip || DEFAULT_HOSPITAL_PROFILE.directorNip,
-          directorTitle: hospData.director_title || DEFAULT_HOSPITAL_PROFILE.directorTitle,
-          committeeLeadName: hospData.committee_lead_name || DEFAULT_HOSPITAL_PROFILE.committeeLeadName,
-          committeeLeadNip: hospData.committee_lead_nip || DEFAULT_HOSPITAL_PROFILE.committeeLeadNip,
-          committeeLeadTitle: hospData.committee_lead_title || DEFAULT_HOSPITAL_PROFILE.committeeLeadTitle,
-        });
+      const res = await pullAllDataFromSupabase();
+      if (res.success && res.data) {
+        if (res.data.alokasiList && res.data.alokasiList.length > 0) {
+          setAlokasiList(res.data.alokasiList);
+        }
+        if (res.data.penerimaList && res.data.penerimaList.length > 0) {
+          setPenerimaList(res.data.penerimaList);
+        }
+        if (res.data.generalIndexList && res.data.generalIndexList.length > 0) {
+          setGeneralIndexList(res.data.generalIndexList);
+        }
+        if (res.data.costCenterList && res.data.costCenterList.length > 0) {
+          setCostCenterList(res.data.costCenterList);
+        }
+        if (res.data.revenueCenterList && res.data.revenueCenterList.length > 0) {
+          setRevenueCenterList(res.data.revenueCenterList);
+        }
+        if (res.data.indeksJasaList && res.data.indeksJasaList.length > 0) {
+          setIndeksJasaList(res.data.indeksJasaList);
+        }
+        if (res.data.users && res.data.users.length > 0) {
+          setUsers(res.data.users);
+        }
+        if (res.data.hospitalProfile) {
+          setHospitalProfile(res.data.hospitalProfile);
+        }
       }
-
-      if (alokasi && alokasi.length > 0) {
-        setAlokasiList(alokasi.map((a: any) => ({
-          id: a.id, kodePeriode: a.kode_periode, bulan: a.bulan, tahun: a.tahun,
-          sumberDana: a.sumber_dana, pendapatanKotor: Number(a.pendapatan_kotor) || 0, 
-          biayaOperasionalRs: Number(a.biaya_operasional_rs) || 0,
-          paguJaspelNetto: Number(a.pagu_jaspel_netto) || 0, 
-          proporsiJaspelPersen: Number(a.proporsi_jaspel_persen) || 42,
-          jasaMedisKlinisPersen: Number(a.jasa_medis_klinis_persen) || 60, 
-          jasaNonKlinisPersen: Number(a.jasa_non_klinis_persen) || 30,
-          jasaManajemenPersen: Number(a.jasa_manajemen_persen) || 10, 
-          status: a.status, keterangan: a.keterangan
-        })));
-      }
-
-      if (penerima && penerima.length > 0) {
-        setPenerimaList(penerima.map((p: any) => ({
-          id: p.id, alokasiId: p.alokasi_id, pegawaiId: p.pegawai_id, nama: p.nama,
-          unitKerja: p.unit_kerja, kategori: p.kategori, jabatan: p.jabatan,
-          poinDasar: Number(p.poin_dasar) || 0, poinKompetensi: Number(p.poin_kompetensi) || 0, 
-          poinRisiko: Number(p.poin_risiko) || 0, poinKinerja: Number(p.poin_kinerja) || 0, 
-          totalPoin: Number(p.total_poin) || 0, nilaiPerPoin: Number(p.nilai_per_poin) || 0,
-          brutoJaspel: Number(p.bruto_jaspel) || 0, pajakPph21Persen: Number(p.pajak_pph21_persen) || 5, 
-          potonganPph21: Number(p.potongan_pph21) || 0, nettoDiterima: Number(p.netto_diterima) || 0,
-          statusKoreksi: p.status_koreksi, catatanKoreksi: p.catatan_koreksi, sudahDibayar: p.sudah_dibayar
-        })));
-      }
-
-      if (genIdx && genIdx.length > 0) {
-        setGeneralIndexList(genIdx.map((g: any) => ({
-          id: g.id, kode: g.kode, nip: g.nip, namaPegawai: g.nama_pegawai, unitKerja: g.unit_kerja,
-          golongan: g.golongan, pendidikan: g.pendidikan, masaKerjaTahun: g.masa_kerja_tahun,
-          skorDasar: Number(g.skor_dasar) || 0, skorKompetensi: Number(g.skor_kompetensi) || 0,
-          skorRisiko: Number(g.skor_risiko) || 0, skorKinerja: Number(g.skor_kinerja) || 0, 
-          bobotPresensi: Number(g.bobot_presensi) || 0, statusPegawai: g.status_pegawai
-        })));
-      }
-
-      if (cost && cost.length > 0) {
-        setCostCenterList(cost.map((c: any) => ({
-          id: c.id, kodeCostCenter: c.kode_cost_center, namaPusatBiaya: c.nama_pusat_biaya,
-          kategori: c.kategori, alokasiAnggaranBulanan: Number(c.alokasi_anggaran_bulanan) || 0,
-          realisasiBiaya: Number(c.realisasi_biaya) || 0, penanggungJawab: c.penanggung_jawab, 
-          status: c.status, keterangan: c.keterangan
-        })));
-      }
-
-      if (revenue && revenue.length > 0) {
-        setRevenueCenterList(revenue.map((r: any) => ({
-          id: r.id, kodeRevenueCenter: r.kode_revenue_center, namaPusatLayanan: r.nama_pusat_layanan,
-          kategoriLayanan: r.kategori_layanan, targetPendapatanBulanan: Number(r.target_pendapatan_bulanan) || 0,
-          realisasiPendapatan: Number(r.realisasi_pendapatan) || 0, 
-          persentasePencapaian: Number(r.persentase_pencapaian) || 0
-        })));
-      }
-
-      if (ijlData && ijlData.length > 0) {
-        setIndeksJasaList(ijlData.map((ijl: any) => ({
-          id: ijl.id,
-          kode: ijl.kode,
-          instalasiLayanan: ijl.instalasi_layanan || ijl.instalasiLayanan,
-          kategori: ijl.kategori || '',
-          kinerja1: Number(ijl.kinerja1) || 0,
-          kinerja2: Number(ijl.kinerja2) || 0,
-          kinerja3: Number(ijl.kinerja3) || 0,
-          totalPoin: Number(ijl.total_poin) || 0,
-          jumlahAlokasi: Number(ijl.jumlah_alokasi) || 0,
-          rupiahPerPoin1: Number(ijl.rupiah_per_poin1) || 0,
-          rupiahPerPoin2: Number(ijl.rupiah_per_poin2) || 0,
-          nilaiJpLangsung: Number(ijl.nilai_jp_langsung) || 0
-        })));
-      }
-
-      if (usr && usr.length > 0) {
-        setUsers(usr.map((u: any) => ({
-          id: u.id, nama: u.nama, role: u.role, unit: u.unit, jabatan: u.jabatan, email: u.email
-        })));
-      }
-
     } catch (error) {
       console.error('Error fetching data from Supabase:', error);
     } finally {
       setIsLoading(false);
+      setTimeout(() => {
+        isFetchingRef.current = false;
+      }, 1000);
     }
   };
 

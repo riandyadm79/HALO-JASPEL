@@ -165,9 +165,9 @@ export const exportToTextSummary = (
 export const exportSlipPdf = (
   p: PenerimaAlokasi,
   alokasi: AlokasiJaspel,
-  instansiName: string = 'INSTANSI RSUD / BLUD',
-  committeeLeadName: string = 'dr. H. Hendra Setiawan, Sp.B',
-  committeeLeadNip: string = '19780512 200312 1 002'
+  instansiName: string = '',
+  committeeLeadName: string = '',
+  committeeLeadNip: string = ''
 ) => {
   const doc = new jsPDF();
 
