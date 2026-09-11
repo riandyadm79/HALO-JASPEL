@@ -43,22 +43,28 @@ export const MobileNav: React.FC<MobileNavProps> = ({
 
   const menuItems = [
     {
-      id: 'alokasi',
-      label: 'Alokasi Jaspel',
-      icon: Calculator,
+      id: 'rekap_cetak',
+      label: 'Rekap & Cetak',
+      icon: FileSpreadsheet,
       roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[]
     },
     {
+      id: 'alokasi',
+      label: 'Alokasi Jaspel',
+      icon: Calculator,
+      roles: ['superadmin'] as RoleType[]
+    },
+    {
       id: 'visualisasi',
-      label: 'Visualisasi Tren',
+      label: 'Visualisasi',
       icon: TrendingUp,
-      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[]
+      roles: ['superadmin'] as RoleType[]
     },
     {
       id: 'database',
       label: 'DB Manajer',
       icon: Database,
-      roles: ['superadmin', 'perumus', 'pic'] as RoleType[]
+      roles: ['superadmin'] as RoleType[]
     },
     {
       id: 'rbac',
@@ -73,8 +79,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       roles: ['superadmin', 'perumus', 'pic'] as RoleType[]
     },
     {
-      id: 'export',
-      label: 'Ekspor / Impor',
+      id: 'export-import',
+      label: 'Ekspor & Impor',
       icon: FileSpreadsheet,
       roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[]
     }

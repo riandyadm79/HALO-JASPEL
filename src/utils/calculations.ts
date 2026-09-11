@@ -1,9 +1,9 @@
 export const formatRupiah = (amount: number): string => {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0
+  const formattedNumber = new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   }).format(amount || 0);
+  return `Rp. ${formattedNumber}`;
 };
 
 export const formatNumber = (num: number): string => {
@@ -98,4 +98,49 @@ export const calculatePenerimaNetto = (
     potonganPph21,
     nettoDiterima
   };
+};
+
+export const evaluateJpFormula = (
+  item: {
+    kinerja1: number;
+    kinerja2: number;
+    kinerja3: number;
+    totalPoin: number;
+    jumlahAlokasi: number;
+    rupiahPerPoin1: number;
+    rupiahPerPoin2: number;
+  },
+  formulaStr: string
+): number => {
+  if (!formulaStr || !formulaStr.trim()) return 0;
+  
+  try {
+    // Replace column names with numeric values
+    let expr = formulaStr
+      .replace(/\bkinerja1\b/gi, String(item.kinerja1 || 0))
+      .replace(/\bkinerja2\b/gi, String(item.kinerja2 || 0))
+      .replace(/\bkinerja3\b/gi, String(item.kinerja3 || 0))
+      .replace(/\btotalPoin\b/gi, String(item.totalPoin || 0))
+      .replace(/\bjumlahAlokasi\b/gi, String(item.jumlahAlokasi || 0))
+      .replace(/\brupiahPerPoin1\b/gi, String(item.rupiahPerPoin1 || 0))
+      .replace(/\brupiahPerPoin2\b/gi, String(item.rupiahPerPoin2 || 0))
+      .replace(/\bK1\b/gi, String(item.kinerja1 || 0))
+      .replace(/\bK2\b/gi, String(item.kinerja2 || 0))
+      .replace(/\bK3\b/gi, String(item.kinerja3 || 0))
+      .replace(/\bTP\b/gi, String(item.totalPoin || 0))
+      .replace(/\bJA\b/gi, String(item.jumlahAlokasi || 0))
+      .replace(/\bRP1\b/gi, String(item.rupiahPerPoin1 || 0))
+      .replace(/\bRP2\b/gi, String(item.rupiahPerPoin2 || 0));
+
+    // Sanitize: allow numbers, spaces, +, -, *, /, %, (, ), .
+    if (/[^0-9\s\+\-\*\/\%\(\)\.]/.test(expr)) {
+      return 0;
+    }
+
+    // Safely evaluate math expression
+    const result = new Function(`"use strict"; return (${expr})`)();
+    return typeof result === 'number' && !isNaN(result) && isFinite(result) ? Math.round(result) : 0;
+  } catch (err) {
+    return 0;
+  }
 };

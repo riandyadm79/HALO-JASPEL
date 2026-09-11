@@ -1,4 +1,15 @@
-export type RoleType = 'superadmin' | 'perumus' | 'pic' | 'staf';
+export type RoleType = 
+  | 'superadmin' 
+  | 'perumus' 
+  | 'pic' 
+  | 'staf'
+  | 'input_perawat'
+  | 'input_medis'
+  | 'input_nakes_lain'
+  | 'input_psikiatri'
+  | 'input_cuti'
+  | 'input_ketenagaan'
+  | 'input_spesialis';
 
 export interface User {
   id: string;
@@ -19,11 +30,19 @@ export interface User {
 export interface Permission {
   id: string;
   name: string;
-  category: 'Alokasi Jaspel' | 'Database Manajer' | 'Formula & Kebijakan' | 'User & RBAC' | 'Supabase & Storage' | 'Ekspor & Laporan';
+  category: 'Alokasi Jaspel' | 'Database Manajer' | 'Formula & Kebijakan' | 'User & RBAC' | 'Supabase & Storage' | 'Ekspor & Laporan' | 'Akses & Cetak Tabel Instalasi/Layanan';
   superadmin: boolean;
   perumus: boolean;
   pic: boolean;
   staf: boolean;
+  input_perawat?: boolean;
+  input_medis?: boolean;
+  input_nakes_lain?: boolean;
+  input_psikiatri?: boolean;
+  input_cuti?: boolean;
+  input_ketenagaan?: boolean;
+  input_spesialis?: boolean;
+  roles?: Partial<Record<RoleType, boolean>>;
   description: string;
 }
 
@@ -106,14 +125,40 @@ export interface GeneralIndexItem {
   nip: string;
   unitKerja: string;
   golongan: string;
-  pendidikan: 'D3' | 'D4 / S1' | 'Profesi / Sp-1' | 'Sp-2 / S3' | 'SMA / Sederajat';
+  pendidikan: string;
   masaKerjaTahun: number;
   skorDasar: number;
   skorKompetensi: number;
   skorRisiko: number;
   skorKinerja: number;
   bobotPresensi: number; // 0 - 100%
-  statusPegawai: 'PNS' | 'PPPK' | 'Non-ASN Kontrak' | 'Dokter Mitra';
+  statusPegawai: string;
+
+  // Extended RSUD Remunerasi Official Spreadsheet Fields
+  no?: number;
+  jabatan?: string;
+  tmtTanggal?: string;
+  ruangan?: string;
+  kelompokJasa?: string;
+  riskCategory?: string;
+  jabatanUnit?: string;
+  skorMk?: number;
+  skorPd?: number;
+  skorJab?: number;
+  skorRis?: number;
+  skorEmg?: number;
+  skorTotal?: number;
+  rpMk?: number;
+  rpPd?: number;
+  rpJab?: number;
+  rpRis?: number;
+  rpEmg?: number;
+  jaspelPostRemunerasi?: number;
+  postPenyesuaianBebanKerja?: number;
+  jaspelPostTotal?: number;
+  kelompokRekap?: string;
+  kelompokPelayanan?: string;
+  persenAdministrasi?: string;
 }
 
 // Database Manajer: Cost Center (Pusat Biaya / Beban)
@@ -141,6 +186,34 @@ export interface RevenueCenterItem {
   proporsiRetensiJaspel: number; // % jaspel langsung unit
   kepalaUnit: string;
   jumlahPasienBulanIni: number;
+}
+
+// Database Manajer: Indeks Jasa Langsung (Sesuai Jumlah Instalasi dan Layanan)
+export interface IndeksJasaLangsungItem {
+  id: string;
+  kode?: string;
+  instalasiLayanan: string;
+  kategori?: string;
+  kinerja1: number;
+  kinerja2: number;
+  kinerja3: number;
+  totalPoin: number;
+  jumlahAlokasi: number;
+  rupiahPerPoin1: number;
+  rupiahPerPoin2: number;
+  nilaiJpLangsung: number;
+}
+
+export interface IndeksJasaHeaderConfig {
+  headerKinerja1: string;
+  headerKinerja2: string;
+  headerKinerja3: string;
+  headerTotalPoin: string;
+  headerJumlahAlokasi: string;
+  headerRupiahPerPoin1: string;
+  headerRupiahPerPoin2: string;
+  headerNilaiJpLangsung: string;
+  formulaJpLangsung: string;
 }
 
 // Supabase Storage Bucket Item

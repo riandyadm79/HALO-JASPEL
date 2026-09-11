@@ -32,6 +32,8 @@ import {
 import { exportToXLSX, exportToCSV, exportToTextSummary } from '../utils/exportImport';
 import { INSTALASI_LAYANAN_LIST } from '../data/initialData';
 import { SlipJaspelModal } from './SlipJaspelModal';
+import { CurrencyInput } from './CurrencyInput';
+import { supabase } from '../lib/supabase';
 
 interface AlokasiManagerProps {
   alokasiList: AlokasiJaspel[];
@@ -66,6 +68,10 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>(selectedCategory || 'all');
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(10);
 
   useEffect(() => {
     if (selectedCategory) {
@@ -140,6 +146,17 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
       return matchSearch && matchCat;
     });
 
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, categoryFilter]);
+
+  // Paginated data
+  const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(filteredRecipients.length / itemsPerPage);
+  const paginatedRecipients = itemsPerPage === 'all' 
+    ? filteredRecipients 
+    : filteredRecipients.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   // Calculate live summary breakdown
   const paguPreview = calculatePaguJaspel(
     formData.pendapatanKotor,
@@ -191,7 +208,7 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
     setShowAddEditModal(true);
   };
 
-  const handleSaveAlokasi = (e: React.FormEvent) => {
+  const handleSaveAlokasi = async (e: React.FormEvent) => {
     e.preventDefault();
     const pagu = calculatePaguJaspel(
       formData.pendapatanKotor,
@@ -202,44 +219,67 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
       formData.jasaManajemenPersen
     );
 
-    if (editingAlokasi) {
-      const updated = alokasiList.map(item => {
-        if (item.id === editingAlokasi.id) {
-          return {
-            ...item,
-            ...formData,
-            paguJaspelKotor: pagu.paguKotor,
-            paguJaspelNetto: pagu.paguNetto,
-            tanggalUpdate: new Date().toISOString()
-          };
-        }
-        return item;
-      });
-      setAlokasiList(updated);
-    } else {
-      const newAlokasi: AlokasiJaspel = {
-        id: `alo-${Date.now()}`,
-        ...formData,
-        paguJaspelKotor: pagu.paguKotor,
-        paguJaspelNetto: pagu.paguNetto,
-        tanggalDibuat: new Date().toISOString(),
-        tanggalUpdate: new Date().toISOString(),
-        createdBy: currentUser.nama
-      };
-      setAlokasiList([newAlokasi, ...alokasiList]);
-      setSelectedAlokasiId(newAlokasi.id);
+    const id = editingAlokasi ? editingAlokasi.id : `alo-${Date.now()}`;
+    const payload = {
+      id,
+      kode_periode: formData.kodePeriode,
+      bulan: formData.bulan,
+      tahun: formData.tahun,
+      sumber_dana: formData.sumberDana,
+      pendapatan_kotor: formData.pendapatanKotor,
+      biaya_operasional_rs: formData.biayaOperasionalRs,
+      pagu_jaspel_netto: pagu.paguNetto,
+      proporsi_jaspel_persen: formData.proporsiJaspelPersen,
+      jasa_medis_klinis_persen: formData.jasaMedisKlinisPersen,
+      jasa_non_klinis_persen: formData.jasaNonKlinisPersen,
+      jasa_manajemen_persen: formData.jasaManajemenPersen,
+      status: formData.status,
+      keterangan: formData.keterangan
+    };
+
+    try {
+      if (editingAlokasi) {
+        await supabase.from('alokasi_jaspel').update(payload).eq('id', id);
+        const updated = alokasiList.map(item => {
+          if (item.id === id) {
+            return {
+              ...item,
+              ...formData,
+              paguJaspelKotor: pagu.paguKotor,
+              paguJaspelNetto: pagu.paguNetto,
+              tanggalUpdate: new Date().toISOString()
+            };
+          }
+          return item;
+        });
+        setAlokasiList(updated);
+      } else {
+        await supabase.from('alokasi_jaspel').insert([payload]);
+        const newAlokasi: AlokasiJaspel = {
+          id,
+          ...formData,
+          paguJaspelKotor: pagu.paguKotor,
+          paguJaspelNetto: pagu.paguNetto,
+          tanggalDibuat: new Date().toISOString(),
+          tanggalUpdate: new Date().toISOString(),
+          createdBy: currentUser.nama
+        };
+        setAlokasiList([newAlokasi, ...alokasiList]);
+        setSelectedAlokasiId(newAlokasi.id);
+      }
+      setShowAddEditModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyimpan Alokasi');
     }
-    setShowAddEditModal(false);
   };
 
-  const handleDeleteAlokasi = (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus alokasi periode ini beserta seluruh rincian stafnya?')) {
-      const updated = alokasiList.filter(a => a.id !== id);
-      setAlokasiList(updated);
+  const handleDeleteAlokasi = async (id: string) => {
+    if (confirm('Yakin ingin menghapus periode alokasi ini? Seluruh data penerima di dalamnya akan ikut terhapus!')) {
+      await supabase.from('alokasi_jaspel').delete().eq('id', id);
+      setAlokasiList(alokasiList.filter(a => a.id !== id));
       setPenerimaList(penerimaList.filter(p => p.alokasiId !== id));
-      if (selectedAlokasiId === id && updated.length > 0) {
-        setSelectedAlokasiId(updated[0].id);
-      }
+      if (selectedAlokasiId === id) setSelectedAlokasiId(alokasiList[0]?.id || '');
     }
   };
 
@@ -282,7 +322,7 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
     setShowRecipientModal(true);
   };
 
-  const handleSaveRecipient = (e: React.FormEvent) => {
+  const handleSaveRecipient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAlokasi) return;
 
@@ -298,40 +338,77 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
       recipientForm.pajakPph21Persen
     );
 
-    if (editingRecipient) {
-      const updated = penerimaList.map(item => {
-        if (item.id === editingRecipient.id) {
-          return {
-            ...item,
-            ...recipientForm,
-            totalPoin,
-            brutoJaspel: calc.brutoJaspel,
-            potonganPph21: calc.potonganPph21,
-            nettoDiterima: calc.nettoDiterima
-          };
+    const id = editingRecipient ? editingRecipient.id : `rec-${Date.now()}`;
+    const payload = {
+      id,
+      alokasi_id: selectedAlokasi.id,
+      pegawai_id: `pegawai-${Date.now()}`,
+      nama: recipientForm.nama,
+      unit_kerja: recipientForm.unitKerja,
+      jabatan: recipientForm.jabatan,
+      kategori: recipientForm.kategori,
+      poin_dasar: recipientForm.poinDasar,
+      poin_kompetensi: recipientForm.poinKompetensi,
+      poin_risiko: recipientForm.poinRisiko,
+      poin_kinerja: recipientForm.poinKinerja,
+      total_poin: totalPoin,
+      nilai_per_poin: recipientForm.nilaiPerPoin,
+      bruto_jaspel: calc.brutoJaspel,
+      pajak_pph21_persen: recipientForm.pajakPph21Persen,
+      potongan_pph21: calc.potonganPph21,
+      netto_diterima: calc.nettoDiterima,
+      status_koreksi: recipientForm.statusKoreksi,
+      catatan_koreksi: recipientForm.catatanKoreksi
+    };
+
+    try {
+      if (editingRecipient) {
+        // preserve existing pegawai_id if possible
+        const existingRec = penerimaList.find(r => r.id === id);
+        if (existingRec) {
+          payload.pegawai_id = existingRec.pegawaiId;
         }
-        return item;
-      });
-      setPenerimaList(updated);
-    } else {
-      const newP: PenerimaAlokasi = {
-        id: `pen-${Date.now()}`,
-        alokasiId: selectedAlokasi.id,
-        pegawaiId: `peg-${Date.now()}`,
-        ...recipientForm,
-        totalPoin,
-        brutoJaspel: calc.brutoJaspel,
-        potonganPph21: calc.potonganPph21,
-        nettoDiterima: calc.nettoDiterima,
-        sudahDibayar: false
-      };
-      setPenerimaList([...penerimaList, newP]);
+        await supabase.from('penerima_alokasi').update(payload).eq('id', id);
+
+        const updated = penerimaList.map(item => {
+          if (item.id === id) {
+            return {
+              ...item,
+              ...recipientForm,
+              totalPoin,
+              brutoJaspel: calc.brutoJaspel,
+              potonganPph21: calc.potonganPph21,
+              nettoDiterima: calc.nettoDiterima
+            };
+          }
+          return item;
+        });
+        setPenerimaList(updated);
+      } else {
+        await supabase.from('penerima_alokasi').insert([payload]);
+        const newRecipient: PenerimaAlokasi = {
+          id,
+          alokasiId: selectedAlokasi.id,
+          pegawaiId: payload.pegawai_id,
+          ...recipientForm,
+          totalPoin,
+          brutoJaspel: calc.brutoJaspel,
+          potonganPph21: calc.potonganPph21,
+          nettoDiterima: calc.nettoDiterima,
+          sudahDibayar: false
+        };
+        setPenerimaList([...penerimaList, newRecipient]);
+      }
+      setShowRecipientModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyimpan Data Penerima');
     }
-    setShowRecipientModal(false);
   };
 
-  const handleDeleteRecipient = (id: string) => {
-    if (confirm('Hapus penerima ini dari alokasi periode ini?')) {
+  const handleDeleteRecipient = async (id: string) => {
+    if (confirm('Hapus penerima dari alokasi ini?')) {
+      await supabase.from('penerima_alokasi').delete().eq('id', id);
       setPenerimaList(penerimaList.filter(p => p.id !== id));
     }
   };
@@ -617,14 +694,14 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-200">
-                {filteredRecipients.length === 0 ? (
+                {paginatedRecipients.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="py-12 text-center text-slate-500 font-medium">
                       Tidak ada data staf penerima yang cocok dengan filter.
                     </td>
                   </tr>
                 ) : (
-                  filteredRecipients.map((p) => (
+                  paginatedRecipients.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-800/40 transition">
                       <td className="py-3 px-4">
                         <div className="font-bold text-white text-xs sm:text-sm">{p.nama}</div>
@@ -691,6 +768,50 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs bg-slate-900/50 p-3 rounded-2xl border border-slate-800">
+            <div className="flex items-center space-x-2 text-slate-400">
+              <span>Tampilkan:</span>
+              <select 
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1 focus:outline-none focus:border-amber-400"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value="all">Semua</option>
+              </select>
+              <span>data dari {filteredRecipients.length} total</span>
+            </div>
+            
+            {itemsPerPage !== 'all' && totalPages > 1 && (
+              <div className="flex items-center space-x-1">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-2 py-1 rounded bg-slate-800 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700"
+                >
+                  Prev
+                </button>
+                <span className="px-3 text-slate-400 font-bold">
+                  {currentPage} / {totalPages}
+                </span>
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-2 py-1 rounded bg-slate-800 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Quick Summary footer */}
@@ -815,31 +936,19 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">
-                    Pendapatan Kotor RS (Rp)
-                  </label>
-                  <input
-                    type="number"
-                    step="1000000"
-                    required
-                    value={formData.pendapatanKotor}
-                    onChange={e => setFormData({ ...formData, pendapatanKotor: Number(e.target.value) })}
-                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">
-                    Biaya Operasional Beban (Rp)
-                  </label>
-                  <input
-                    type="number"
-                    step="500000"
-                    value={formData.biayaOperasionalRs}
-                    onChange={e => setFormData({ ...formData, biayaOperasionalRs: Number(e.target.value) })}
-                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono"
-                  />
-                </div>
+                <CurrencyInput
+                  label="Pendapatan Kotor RS (Rp)"
+                  required
+                  value={formData.pendapatanKotor}
+                  onChange={val => setFormData({ ...formData, pendapatanKotor: val })}
+                  placeholder="3850000000"
+                />
+                <CurrencyInput
+                  label="Biaya Operasional Beban (Rp)"
+                  value={formData.biayaOperasionalRs}
+                  onChange={val => setFormData({ ...formData, biayaOperasionalRs: val })}
+                  placeholder="385000000"
+                />
                 <div>
                   <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">
                     Proporsi Jaspel (%)

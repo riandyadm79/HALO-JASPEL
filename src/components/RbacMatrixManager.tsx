@@ -17,6 +17,7 @@ import {
   Info
 } from 'lucide-react';
 import { User, Permission, RoleType } from '../types';
+import { supabase } from '../lib/supabase';
 import { INSTALASI_LAYANAN_LIST } from '../data/initialData';
 
 interface RbacMatrixManagerProps {
@@ -63,7 +64,7 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
     superadmin: {
       label: 'Superadmin',
       desc: 'Kendali penuh seluruh modul, bypass RLS, manajemen pengguna & database',
-      color: 'bg-blue-950 text-blue-300 border-blue-800'
+      color: 'bg-rose-950 text-rose-300 border-rose-800'
     },
     perumus: {
       label: 'Tim Perumus',
@@ -79,8 +80,57 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
       label: 'Staf / Penerima',
       desc: 'Transparansi slip jaspel pribadi, rincian skor poin, unduh PDF slip gaji',
       color: 'bg-slate-800 text-slate-300 border-slate-700'
+    },
+    input_perawat: {
+      label: 'Input Perawat',
+      desc: 'Operator input & rekap khusus tabel layanan perawat & kebidanan',
+      color: 'bg-emerald-950 text-emerald-300 border-emerald-800'
+    },
+    input_medis: {
+      label: 'Input Medis (Dr. Umum)',
+      desc: 'Operator input & rekap khusus tabel layanan dokter umum & medis klinis',
+      color: 'bg-cyan-950 text-cyan-300 border-cyan-800'
+    },
+    input_spesialis: {
+      label: 'Input Spesialis',
+      desc: 'Operator input & rekap khusus tabel layanan dokter spesialis',
+      color: 'bg-purple-950 text-purple-300 border-purple-800'
+    },
+    input_psikiatri: {
+      label: 'Input Psikiatri',
+      desc: 'Operator input & rekap khusus tabel layanan psikiatri & kesehatan jiwa',
+      color: 'bg-pink-950 text-pink-300 border-pink-800'
+    },
+    input_nakes_lain: {
+      label: 'Input Nakes Lain',
+      desc: 'Operator input & rekap layanan gizi, farmasi, lab, radiologi, fisio, dll.',
+      color: 'bg-teal-950 text-teal-300 border-teal-800'
+    },
+    input_cuti: {
+      label: 'Input Cuti & Presensi',
+      desc: 'Operator input & rekap bobot presensi, cuti pegawai, dan indeks presensi',
+      color: 'bg-indigo-950 text-indigo-300 border-indigo-800'
+    },
+    input_ketenagaan: {
+      label: 'Input Ketenagaan & Indeks',
+      desc: 'Operator input & rekap database ketenagaan, struktural, administrasi & general index',
+      color: 'bg-violet-950 text-violet-300 border-violet-800'
     }
   };
+
+  const ALL_ROLE_KEYS: RoleType[] = [
+    'superadmin',
+    'perumus',
+    'pic',
+    'staf',
+    'input_perawat',
+    'input_medis',
+    'input_spesialis',
+    'input_psikiatri',
+    'input_nakes_lain',
+    'input_cuti',
+    'input_ketenagaan'
+  ];
 
   const categories = Array.from(new Set(permissions.map(p => p.category)));
 
@@ -145,22 +195,36 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
     setShowUserModal(true);
   };
 
-  const handleSaveUser = (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingUser) {
-      setUsers(users.map(u => u.id === editingUser.id ? { ...userForm, id: u.id } : u));
-    } else {
-      setUsers([...users, { ...userForm, id: `u-${Date.now()}` }]);
+    const id = editingUser ? editingUser.id : `u-${Date.now()}`;
+    const payload = {
+      id,
+      username: userForm.username,
+      nama: userForm.nama,
+      role: userForm.role,
+      unit: userForm.unit,
+      jabatan: userForm.jabatan
+    };
+    
+    try {
+      if (editingUser) {
+        await supabase.from('users_rbac').update(payload).eq('id', id);
+        setUsers(users.map(u => u.id === id ? { ...userForm, id } : u));
+      } else {
+        await supabase.from('users_rbac').insert([payload]);
+        setUsers([...users, { ...userForm, id }]);
+      }
+      setShowUserModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyimpan pengguna');
     }
-    setShowUserModal(false);
   };
 
-  const handleDeleteUser = (id: string) => {
-    if (id === currentUser.id) {
-      alert('Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif.');
-      return;
-    }
-    if (confirm('Hapus pengguna ini dari sistem RBAC?')) {
+  const handleDeleteUser = async (id: string) => {
+    if (confirm('Yakin ingin menghapus akses pengguna ini?')) {
+      await supabase.from('users_rbac').delete().eq('id', id);
       setUsers(users.filter(u => u.id !== id));
     }
   };
@@ -319,86 +383,49 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
                   <tr>
-                    <th className="py-3.5 px-4 w-1/3">Fitur / Hak Akses</th>
-                    <th className="py-3.5 px-3">Kategori</th>
-                    <th className="py-3.5 px-3 text-center text-rose-300">Superadmin</th>
-                    <th className="py-3.5 px-3 text-center text-amber-300">Tim Perumus</th>
-                    <th className="py-3.5 px-3 text-center text-blue-300">PIC (Unit)</th>
-                    <th className="py-3.5 px-3 text-center text-slate-300">Staf / Penerima</th>
+                    <th className="py-3.5 px-4 min-w-[200px]">Fitur / Hak Akses</th>
+                    <th className="py-3.5 px-2 min-w-[120px]">Kategori</th>
+                    {ALL_ROLE_KEYS.map(rk => (
+                      <th key={rk} className="py-3.5 px-2 text-center whitespace-nowrap min-w-[70px]">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${roleMeta[rk]?.color || 'bg-slate-800 text-slate-300 border-slate-700'}`}>
+                          {roleMeta[rk]?.label.split(' ')[0]}
+                        </span>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-slate-200">
                   {filteredPermissions.map(p => (
                     <tr key={p.id} className="hover:bg-slate-800/40 transition">
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-white text-xs sm:text-sm">{p.name}</div>
+                        <div className="font-bold text-white text-xs">{p.name}</div>
                         <div className="text-[11px] text-slate-400 mt-0.5">{p.description}</div>
                       </td>
-                      <td className="py-3.5 px-3">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 border border-slate-700 text-slate-300">
+                      <td className="py-3.5 px-2">
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-800 border border-slate-700 text-slate-300 whitespace-nowrap">
                           {p.category}
                         </span>
                       </td>
 
-                      {/* Superadmin Checkbox */}
-                      <td className="py-3.5 px-3 text-center">
-                        <button
-                          disabled={!canManageUsers}
-                          onClick={() => togglePermission(p.id, 'superadmin')}
-                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition ${
-                            p.superadmin 
-                              ? 'bg-rose-950 border border-rose-700 text-rose-300' 
-                              : 'bg-slate-800/50 text-slate-600'
-                          } ${canManageUsers ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
-                        >
-                          {p.superadmin ? <Check className="w-4 h-4 font-bold" /> : <X className="w-3.5 h-3.5" />}
-                        </button>
-                      </td>
-
-                      {/* Tim Perumus Checkbox */}
-                      <td className="py-3.5 px-3 text-center">
-                        <button
-                          disabled={!canManageUsers}
-                          onClick={() => togglePermission(p.id, 'perumus')}
-                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition ${
-                            p.perumus 
-                              ? 'bg-amber-950 border border-amber-700 text-amber-300' 
-                              : 'bg-slate-800/50 text-slate-600'
-                          } ${canManageUsers ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
-                        >
-                          {p.perumus ? <Check className="w-4 h-4 font-bold" /> : <X className="w-3.5 h-3.5" />}
-                        </button>
-                      </td>
-
-                      {/* PIC Unit Checkbox */}
-                      <td className="py-3.5 px-3 text-center">
-                        <button
-                          disabled={!canManageUsers}
-                          onClick={() => togglePermission(p.id, 'pic')}
-                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition ${
-                            p.pic 
-                              ? 'bg-blue-950 border border-blue-700 text-blue-300' 
-                              : 'bg-slate-800/50 text-slate-600'
-                          } ${canManageUsers ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
-                        >
-                          {p.pic ? <Check className="w-4 h-4 font-bold" /> : <X className="w-3.5 h-3.5" />}
-                        </button>
-                      </td>
-
-                      {/* Staf Checkbox */}
-                      <td className="py-3.5 px-3 text-center">
-                        <button
-                          disabled={!canManageUsers}
-                          onClick={() => togglePermission(p.id, 'staf')}
-                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition ${
-                            p.staf 
-                              ? 'bg-emerald-950 border border-emerald-700 text-emerald-300' 
-                              : 'bg-slate-800/50 text-slate-600'
-                          } ${canManageUsers ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
-                        >
-                          {p.staf ? <Check className="w-4 h-4 font-bold" /> : <X className="w-3.5 h-3.5" />}
-                        </button>
-                      </td>
+                      {ALL_ROLE_KEYS.map(rk => {
+                        const isGranted = !!(p as any)[rk];
+                        return (
+                          <td key={rk} className="py-3.5 px-2 text-center">
+                            <button
+                              disabled={!canManageUsers}
+                              onClick={() => togglePermission(p.id, rk)}
+                              title={`${roleMeta[rk]?.label}: ${isGranted ? 'Diizinkan' : 'Dilarang'}`}
+                              className={`w-6 h-6 rounded-md inline-flex items-center justify-center transition ${
+                                isGranted 
+                                  ? 'bg-emerald-950 border border-emerald-600 text-emerald-300 shadow-sm' 
+                                  : 'bg-slate-800/40 text-slate-600'
+                              } ${canManageUsers ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
+                            >
+                              {isGranted ? <Check className="w-3.5 h-3.5 font-bold" /> : <X className="w-3 h-3" />}
+                            </button>
+                          </td>
+                        );
+                      })}
 
                     </tr>
                   ))}
@@ -539,10 +566,11 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
                     onChange={e => setUserForm({ ...userForm, role: e.target.value as any })}
                     className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-amber-300 font-bold"
                   >
-                    <option value="superadmin">Superadmin</option>
-                    <option value="perumus">Tim Perumus</option>
-                    <option value="pic">PIC (Kepala Ruangan/Unit)</option>
-                    <option value="staf">Staf / Penerima Jaspel</option>
+                    {ALL_ROLE_KEYS.map(rk => (
+                      <option key={rk} value={rk}>
+                        {roleMeta[rk]?.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

@@ -3,7 +3,7 @@
 /* ========================================================
    LIGHT THEME SYSTEM FOR HALO JASPEL
    (Activated when [data-theme="light"] or .light is on <html>)
-   Dark Theme is the default / preserved Executive Navy Theme.
+   Dark Theme is the default Executive Navy Theme.
    ======================================================== */
 
 [data-theme="light"] {
@@ -18,7 +18,9 @@ html[data-theme="light"] {
   color: #0f172a !important;
 }
 
-[data-theme="light"] .bg-\[\#07090e\] {
+[data-theme="light"] .bg-\[\#07090e\],
+[data-theme="light"] .bg-\[\#080e22\],
+[data-theme="light"] .bg-\[\#0a132c\] {
   background-color: #f8fafc !important;
   color: #0f172a !important;
 }
@@ -26,8 +28,8 @@ html[data-theme="light"] {
 /* Top Navbar in Light Mode */
 [data-theme="light"] header.bg-\[\#0c1633\] {
   background-color: #ffffff !important;
-  border-bottom-color: #e2e8f0 !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+  border-bottom-color: #cbd5e1 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08) !important;
 }
 
 [data-theme="light"] header.bg-\[\#0c1633\] h1 {
@@ -35,7 +37,7 @@ html[data-theme="light"] {
 }
 
 [data-theme="light"] header.bg-\[\#0c1633\] p {
-  color: #64748b !important;
+  color: #334155 !important;
 }
 
 [data-theme="light"] header.bg-\[\#0c1633\] .bg-blue-900\/80 {
@@ -49,7 +51,8 @@ html[data-theme="light"] {
   border-color: #cbd5e1 !important;
 }
 
-[data-theme="light"] header.bg-\[\#0c1633\] .bg-blue-950\/60 span.text-white {
+[data-theme="light"] header.bg-\[\#0c1633\] .bg-blue-950\/60 span.text-white,
+[data-theme="light"] header.bg-\[\#0c1633\] .bg-blue-950\/60 span {
   color: #0f172a !important;
 }
 
@@ -65,14 +68,15 @@ html[data-theme="light"] {
 /* User Switcher Dropdown */
 [data-theme="light"] .bg-\[\#0f1d38\] {
   background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+  color: #0f172a !important;
 }
 
 /* Sidebar in Light Mode */
 [data-theme="light"] aside {
   background-color: #ffffff !important;
-  border-right-color: #e2e8f0 !important;
+  border-right-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] aside button.bg-blue-600,
@@ -92,8 +96,9 @@ html[data-theme="light"] {
 [data-theme="light"] .bg-slate-900\/60,
 [data-theme="light"] .bg-slate-900\/40 {
   background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04) !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06) !important;
 }
 
 [data-theme="light"] .bg-slate-950,
@@ -101,14 +106,42 @@ html[data-theme="light"] {
 [data-theme="light"] .bg-slate-950\/80,
 [data-theme="light"] .bg-slate-950\/60 {
   background-color: #f8fafc !important;
-  border-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
 }
 
 [data-theme="light"] .bg-\[\#0b142b\],
-[data-theme="light"] .bg-\[\#0b142b\]\/80 {
+[data-theme="light"] .bg-\[\#0b142b\]\/80,
+[data-theme="light"] .bg-\[\#0b1329\] {
   background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Fix Stat Cards inside dark containers when in light mode */
+[data-theme="light"] .bg-\[\#0b1329\] span.text-blue-200,
+[data-theme="light"] .bg-\[\#0b1329\] span.text-slate-400 {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .bg-\[\#0b1329\] span.text-white,
+[data-theme="light"] .bg-\[\#0b1329\] p.text-white {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+}
+
+[data-theme="light"] .bg-\[\#0b1329\] span.text-emerald-300,
+[data-theme="light"] .bg-\[\#0b1329\] span.text-emerald-400 {
+  color: #047857 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .bg-\[\#0b1329\] p.text-amber-300,
+[data-theme="light"] .bg-\[\#0b1329\] span.text-amber-300,
+[data-theme="light"] .bg-\[\#0b1329\] p.text-amber-400 {
+  color: #b45309 !important;
+  font-weight: 800 !important;
 }
 
 /* Blue-tinted card surfaces */
@@ -138,26 +171,14 @@ html[data-theme="light"] {
   box-shadow: 0 10px 25px -5px rgba(30, 58, 138, 0.25) !important;
 }
 
-[data-theme="light"] .bg-gradient-to-r.from-\[\#172554\].via-\[\#0f1d38\].to-\[\#1e3a8a\] h2 {
+[data-theme="light"] .bg-gradient-to-r.from-\[\#172554\].via-\[\#0f1d38\].to-\[\#1e3a8a\] h2,
+[data-theme="light"] .bg-gradient-to-r.from-\[\#172554\].via-\[\#0f1d38\].to-\[\#1e3a8a\] h3,
+[data-theme="light"] .bg-gradient-to-r.from-\[\#172554\].via-\[\#0f1d38\].to-\[\#1e3a8a\] span:not(.text-slate-950) {
   color: #ffffff !important;
 }
 
 [data-theme="light"] .bg-gradient-to-r.from-\[\#172554\].via-\[\#0f1d38\].to-\[\#1e3a8a\] p {
   color: #dbeafe !important;
-}
-
-/* Quick Stats Card in Alokasi Manager */
-[data-theme="light"] .bg-\[\#0b142b\]\/80 span.text-blue-300 {
-  color: #2563eb !important;
-  font-weight: 700 !important;
-}
-
-[data-theme="light"] .bg-\[\#0b142b\]\/80 p.text-white {
-  color: #0f172a !important;
-}
-
-[data-theme="light"] .bg-\[\#0b142b\]\/80 span.text-blue-300\/70 {
-  color: #64748b !important;
 }
 
 /* Inputs, Textareas, and Form Selects */
@@ -182,14 +203,10 @@ html[data-theme="light"] {
 }
 
 /* General Text Contrast in Light Mode */
-[data-theme="light"] h1:not(.bg-gradient-to-r *),
-[data-theme="light"] h2:not(.bg-gradient-to-r *),
-[data-theme="light"] h3:not(.bg-gradient-to-r *),
-[data-theme="light"] h4:not(.bg-gradient-to-r *) {
-  color: #0f172a !important;
-}
-
-[data-theme="light"] .text-white:not(button.bg-blue-600 *):not(button.bg-blue-700 *):not(button.bg-emerald-600 *):not(button.bg-rose-600 *):not(.bg-gradient-to-r *):not(.bg-blue-600 *):not(.bg-blue-700 *) {
+[data-theme="light"] h1:not(.bg-gradient-to-r *):not(header *),
+[data-theme="light"] h2:not(.bg-gradient-to-r *):not(header *),
+[data-theme="light"] h3:not(.bg-gradient-to-r *):not(header *),
+[data-theme="light"] h4:not(.bg-gradient-to-r *):not(header *) {
   color: #0f172a !important;
 }
 
@@ -203,7 +220,7 @@ html[data-theme="light"] {
 }
 
 [data-theme="light"] .text-slate-400 {
-  color: #64748b !important;
+  color: #475569 !important;
 }
 
 [data-theme="light"] .text-blue-100,
@@ -244,7 +261,7 @@ html[data-theme="light"] {
 [data-theme="light"] .border-blue-800\/60,
 [data-theme="light"] .border-blue-800\/70,
 [data-theme="light"] .border-blue-800\/80 {
-  border-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
 }
 
 /* Tables in Light Mode */
@@ -258,7 +275,7 @@ html[data-theme="light"] {
 }
 
 [data-theme="light"] thead th {
-  color: #475569 !important;
+  color: #1e293b !important;
   font-weight: 800 !important;
 }
 
@@ -295,7 +312,7 @@ html[data-theme="light"] {
 [data-theme="light"] .fixed .bg-\[\#0c1633\],
 [data-theme="light"] .fixed .bg-\[\#0f1d38\] {
   background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.18) !important;
   color: #0f172a !important;
 }
@@ -303,12 +320,12 @@ html[data-theme="light"] {
 /* Mobile Nav bottom bar in Light Mode */
 [data-theme="light"] nav.bg-\[\#0c1633\] {
   background-color: #ffffff !important;
-  border-top-color: #e2e8f0 !important;
+  border-top-color: #cbd5e1 !important;
   box-shadow: 0 -4px 15px -3px rgba(0, 0, 0, 0.05) !important;
 }
 
 [data-theme="light"] nav.bg-\[\#0c1633\] .text-slate-400 {
-  color: #64748b !important;
+  color: #475569 !important;
 }
 
 /* Badges and Chips in Light Mode */
@@ -340,4 +357,36 @@ html[data-theme="light"] {
   background-color: #e0e7ff !important;
   color: #3730a3 !important;
   border-color: #c7d2fe !important;
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  header, aside, nav, button, .no-print {
+    display: none !important;
+  }
+
+  .print\\:block {
+    display: block !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  th, td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 8px !important;
+    color: #000000 !important;
+    font-size: 11px !important;
+  }
+
+  thead th {
+    background-color: #f1f5f9 !important;
+  }
 }

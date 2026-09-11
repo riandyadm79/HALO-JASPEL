@@ -17,12 +17,29 @@ import {
   Award, 
   Filter,
   CheckCircle2,
-  PieChart
+  PieChart,
+  Sliders,
+  Calculator,
+  HelpCircle,
+  Check,
+  Sparkles,
+  Code,
+  Info
 } from 'lucide-react';
-import { GeneralIndexItem, CostCenterItem, RevenueCenterItem, User } from '../types';
-import { formatRupiah, formatNumber, formatPercentage } from '../utils/calculations';
+import { 
+  GeneralIndexItem, 
+  CostCenterItem, 
+  RevenueCenterItem, 
+  IndeksJasaLangsungItem,
+  IndeksJasaHeaderConfig,
+  User 
+} from '../types';
+import { formatRupiah, formatNumber, formatPercentage, evaluateJpFormula } from '../utils/calculations';
+import { supabase } from "../lib/supabase";
 import { exportToCSV } from '../utils/exportImport';
-import { INSTALASI_LAYANAN_LIST } from '../data/initialData';
+import { INSTALASI_LAYANAN_LIST, DEFAULT_INDEKS_JASA_HEADER_CONFIG, INITIAL_INDEKS_JASA_LANGSUNG } from '../data/initialData';
+import { OFFICIAL_GENERAL_INDEX_DATA } from '../data/generalIndexData';
+import { CurrencyInput } from './CurrencyInput';
 
 interface DatabaseManagerProps {
   generalIndexList: GeneralIndexItem[];
@@ -31,9 +48,13 @@ interface DatabaseManagerProps {
   setCostCenterList: React.Dispatch<React.SetStateAction<CostCenterItem[]>>;
   revenueCenterList: RevenueCenterItem[];
   setRevenueCenterList: React.Dispatch<React.SetStateAction<RevenueCenterItem[]>>;
+  indeksJasaList?: IndeksJasaLangsungItem[];
+  setIndeksJasaList?: React.Dispatch<React.SetStateAction<IndeksJasaLangsungItem[]>>;
+  indeksJasaHeaderConfig?: IndeksJasaHeaderConfig;
+  setIndeksJasaHeaderConfig?: React.Dispatch<React.SetStateAction<IndeksJasaHeaderConfig>>;
   currentUser: User;
-  subTab?: 'general' | 'cost' | 'revenue';
-  setSubTab?: (tab: 'general' | 'cost' | 'revenue') => void;
+  subTab?: 'general' | 'cost' | 'revenue' | 'indeks_jasa';
+  setSubTab?: (tab: 'general' | 'cost' | 'revenue' | 'indeks_jasa') => void;
 }
 
 export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
@@ -43,16 +64,28 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
   setCostCenterList,
   revenueCenterList,
   setRevenueCenterList,
+  indeksJasaList,
+  setIndeksJasaList,
+  indeksJasaHeaderConfig,
+  setIndeksJasaHeaderConfig,
   currentUser,
   subTab,
   setSubTab
 }) => {
-  const [internalSubTab, setInternalSubTab] = useState<'general' | 'cost' | 'revenue'>('general');
+  const [internalSubTab, setInternalSubTab] = useState<'general' | 'cost' | 'revenue' | 'indeks_jasa'>('general');
   const activeSubTab = subTab !== undefined ? subTab : internalSubTab;
-  const setActiveSubTab = (tab: 'general' | 'cost' | 'revenue') => {
+  const setActiveSubTab = (tab: 'general' | 'cost' | 'revenue' | 'indeks_jasa') => {
     if (setSubTab) setSubTab(tab);
     setInternalSubTab(tab);
   };
+
+  const [internalIndeksJasaList, setInternalIndeksJasaList] = useState<IndeksJasaLangsungItem[]>(INITIAL_INDEKS_JASA_LANGSUNG);
+  const currentIndeksJasaList = indeksJasaList || internalIndeksJasaList;
+  const updateIndeksJasaList = setIndeksJasaList || setInternalIndeksJasaList;
+
+  const [internalHeaderConfig, setInternalHeaderConfig] = useState<IndeksJasaHeaderConfig>(DEFAULT_INDEKS_JASA_HEADER_CONFIG);
+  const currentHeaderConfig = indeksJasaHeaderConfig || internalHeaderConfig;
+  const updateHeaderConfig = setIndeksJasaHeaderConfig || setInternalHeaderConfig;
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -65,6 +98,16 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
 
   const [showRevenueModal, setShowRevenueModal] = useState(false);
   const [editingRevenue, setEditingRevenue] = useState<RevenueCenterItem | null>(null);
+
+  const [showIndeksJasaModal, setShowIndeksJasaModal] = useState(false);
+  const [editingIndeksJasa, setEditingIndeksJasa] = useState<IndeksJasaLangsungItem | null>(null);
+
+  const [showFormulaHeaderModal, setShowFormulaHeaderModal] = useState(false);
+  const [tempHeaderConfig, setTempHeaderConfig] = useState<IndeksJasaHeaderConfig>(currentHeaderConfig);
+
+  useEffect(() => {
+    setTempHeaderConfig(currentHeaderConfig);
+  }, [currentHeaderConfig]);
 
   // Forms state
   const [indexForm, setIndexForm] = useState<Omit<GeneralIndexItem, 'id'>>({
@@ -106,7 +149,21 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
     jumlahPasienBulanIni: 1000
   });
 
-  const canEdit = ['superadmin', 'perumus'].includes(currentUser?.role || 'staf');
+  const [indeksJasaForm, setIndeksJasaForm] = useState<Omit<IndeksJasaLangsungItem, 'id'>>({
+    kode: 'IJL-007',
+    instalasiLayanan: 'Instalasi Rawat Jalan (IRJ)',
+    kategori: 'Pelayanan Medis',
+    kinerja1: 100,
+    kinerja2: 80,
+    kinerja3: 90,
+    totalPoin: 270,
+    jumlahAlokasi: 200000000,
+    rupiahPerPoin1: 150000,
+    rupiahPerPoin2: 120000,
+    nilaiJpLangsung: 0
+  });
+
+  const canEdit = ['superadmin', 'perumus', 'input_medis', 'input_perawat', 'input_nakes_lain', 'input_psikiatri', 'input_spesialis'].includes(currentUser?.role || 'staf');
 
   // Filtered lists
   const filteredGeneral = generalIndexList.filter(item => 
@@ -127,58 +184,206 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
     item.kepalaUnit.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Handlers for General Index
-  const handleSaveIndex = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingIndex) {
-      setGeneralIndexList(generalIndexList.map(i => i.id === editingIndex.id ? { ...indexForm, id: i.id } : i));
-    } else {
-      setGeneralIndexList([...generalIndexList, { ...indexForm, id: `idx-${Date.now()}` }]);
+  const filteredIndeksJasa = currentIndeksJasaList.filter(item => {
+    const matchesSearch = 
+      item.instalasiLayanan.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.kode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.kategori.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const role = currentUser?.role || 'staf';
+    if (role === 'input_perawat') {
+      return matchesSearch && (item.kategori.toLowerCase().includes('perawat') || item.instalasiLayanan.toLowerCase().includes('perawat'));
     }
-    setShowIndexModal(false);
+    if (role === 'input_medis') {
+      return matchesSearch && (item.kategori.toLowerCase().includes('medis') || item.instalasiLayanan.toLowerCase().includes('dokter'));
+    }
+    if (role === 'input_psikiatri') {
+      return matchesSearch && (item.instalasiLayanan.toLowerCase().includes('psikiatri') || item.kategori.toLowerCase().includes('psikiatri'));
+    }
+    if (role === 'input_spesialis') {
+      return matchesSearch && (item.instalasiLayanan.toLowerCase().includes('spesialis') || item.kategori.toLowerCase().includes('spesialis'));
+    }
+    if (role === 'input_nakes_lain') {
+      return matchesSearch && (item.kategori.toLowerCase().includes('penunjang') || item.kategori.toLowerCase().includes('nakes'));
+    }
+
+    return matchesSearch;
+  });
+
+  // Handlers for General Index
+  const handleSaveIndex = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = editingIndex ? editingIndex.id : `idx-${Date.now()}`;
+    const payload = {
+      id,
+      kode: indexForm.kode,
+      nama_pegawai: indexForm.namaPegawai,
+      nip: indexForm.nip,
+      unit_kerja: indexForm.unitKerja,
+      golongan: indexForm.golongan,
+      pendidikan: indexForm.pendidikan,
+      masa_kerja_tahun: indexForm.masaKerjaTahun,
+      skor_dasar: indexForm.skorDasar,
+      skor_kompetensi: indexForm.skorKompetensi,
+      skor_risiko: indexForm.skorRisiko,
+      skor_kinerja: indexForm.skorKinerja,
+      bobot_presensi: indexForm.bobotPresensi,
+      status_pegawai: indexForm.statusPegawai
+    };
+
+    try {
+      if (editingIndex) {
+        await supabase.from('general_index').update(payload).eq('id', id);
+        setGeneralIndexList(generalIndexList.map(i => i.id === id ? { ...indexForm, id } : i));
+      } else {
+        await supabase.from('general_index').insert([payload]);
+        setGeneralIndexList([...generalIndexList, { ...indexForm, id }]);
+      }
+      setShowIndexModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyimpan data ke database');
+    }
   };
 
-  const handleDeleteIndex = (id: string) => {
+  const handleDeleteIndex = async (id: string) => {
     if (confirm('Hapus pegawai dari master General Index?')) {
+      await supabase.from('general_index').delete().eq('id', id);
       setGeneralIndexList(generalIndexList.filter(i => i.id !== id));
     }
   };
 
   // Handlers for Cost Center
-  const handleSaveCost = (e: React.FormEvent) => {
+  const handleSaveCost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingCost) {
-      setCostCenterList(costCenterList.map(c => c.id === editingCost.id ? { ...costForm, id: c.id } : c));
-    } else {
-      setCostCenterList([...costCenterList, { ...costForm, id: `cc-${Date.now()}` }]);
+    const id = editingCost ? editingCost.id : `cc-${Date.now()}`;
+    const payload = {
+      id,
+      kode_cost_center: costForm.kodeCostCenter,
+      nama_pusat_biaya: costForm.namaPusatBiaya,
+      kategori: costForm.kategori,
+      alokasi_anggaran_bulanan: costForm.alokasiAnggaranBulanan,
+      realisasi_biaya: costForm.realisasiBiaya,
+      penanggung_jawab: costForm.penanggungJawab,
+      status: costForm.status,
+      keterangan: costForm.keterangan
+    };
+
+    try {
+      if (editingCost) {
+        await supabase.from('cost_center').update(payload).eq('id', id);
+        setCostCenterList(costCenterList.map(c => c.id === id ? { ...costForm, id } : c));
+      } else {
+        await supabase.from('cost_center').insert([payload]);
+        setCostCenterList([...costCenterList, { ...costForm, id }]);
+      }
+      setShowCostModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyimpan Cost Center');
     }
-    setShowCostModal(false);
   };
 
-  const handleDeleteCost = (id: string) => {
+  const handleDeleteCost = async (id: string) => {
     if (confirm('Hapus Cost Center ini?')) {
+      await supabase.from('cost_center').delete().eq('id', id);
       setCostCenterList(costCenterList.filter(c => c.id !== id));
     }
   };
 
   // Handlers for Revenue Center
-  const handleSaveRevenue = (e: React.FormEvent) => {
+  const handleSaveRevenue = async (e: React.FormEvent) => {
     e.preventDefault();
     const percent = Number(((revenueForm.realisasiPendapatan / (revenueForm.targetPendapatanBulanan || 1)) * 100).toFixed(1));
-    const payload = { ...revenueForm, persentasePencapaian: percent };
+    const newRevenueForm = { ...revenueForm, persentasePencapaian: percent };
+    
+    const id = editingRevenue ? editingRevenue.id : `rc-${Date.now()}`;
+    const payload = {
+      id,
+      kode_revenue_center: newRevenueForm.kodeRevenueCenter,
+      nama_pusat_layanan: newRevenueForm.namaPusatLayanan,
+      kategori_layanan: newRevenueForm.kategoriLayanan,
+      target_pendapatan_bulanan: newRevenueForm.targetPendapatanBulanan,
+      realisasi_pendapatan: newRevenueForm.realisasiPendapatan,
+      persentase_pencapaian: newRevenueForm.persentasePencapaian
+    };
 
-    if (editingRevenue) {
-      setRevenueCenterList(revenueCenterList.map(r => r.id === editingRevenue.id ? { ...payload, id: r.id } : r));
-    } else {
-      setRevenueCenterList([...revenueCenterList, { ...payload, id: `rc-${Date.now()}` }]);
+    try {
+      if (editingRevenue) {
+        await supabase.from('revenue_center').update(payload).eq('id', id);
+        setRevenueCenterList(revenueCenterList.map(r => r.id === id ? { ...newRevenueForm, id } : r));
+      } else {
+        await supabase.from('revenue_center').insert([payload]);
+        setRevenueCenterList([...revenueCenterList, { ...newRevenueForm, id }]);
+      }
+      setShowRevenueModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyimpan Revenue Center');
     }
-    setShowRevenueModal(false);
   };
 
-  const handleDeleteRevenue = (id: string) => {
+  const handleDeleteRevenue = async (id: string) => {
     if (confirm('Hapus Revenue Center ini?')) {
+      await supabase.from('revenue_center').delete().eq('id', id);
       setRevenueCenterList(revenueCenterList.filter(r => r.id !== id));
     }
+  };
+
+  // Handlers for Indeks Jasa Langsung
+  const handleSaveIndeksJasa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const computedJp = evaluateJpFormula(indeksJasaForm, currentHeaderConfig.formulaJpLangsung);
+    const newForm = { ...indeksJasaForm, nilaiJpLangsung: computedJp };
+
+    const id = editingIndeksJasa ? editingIndeksJasa.id : `ijl-${Date.now()}`;
+    const payload = {
+      id,
+      kode: newForm.kode,
+      instalasi_layanan: newForm.instalasiLayanan,
+      kategori: newForm.kategori,
+      kinerja1: newForm.kinerja1,
+      kinerja2: newForm.kinerja2,
+      kinerja3: newForm.kinerja3,
+      total_poin: newForm.totalPoin,
+      jumlah_alokasi: newForm.jumlahAlokasi,
+      rupiah_per_poin1: newForm.rupiahPerPoin1,
+      rupiah_per_poin2: newForm.rupiahPerPoin2,
+      nilai_jp_langsung: newForm.nilaiJpLangsung
+    };
+
+    try {
+      if (editingIndeksJasa) {
+        await supabase.from('indeks_jasa_langsung').update(payload).eq('id', id);
+        updateIndeksJasaList(currentIndeksJasaList.map(i => i.id === id ? { ...newForm, id } : i));
+      } else {
+        await supabase.from('indeks_jasa_langsung').insert([payload]);
+        updateIndeksJasaList([...currentIndeksJasaList, { ...newForm, id }]);
+      }
+    } catch (err) {
+      console.error(err);
+      if (editingIndeksJasa) {
+        updateIndeksJasaList(currentIndeksJasaList.map(i => i.id === id ? { ...newForm, id } : i));
+      } else {
+        updateIndeksJasaList([...currentIndeksJasaList, { ...newForm, id }]);
+      }
+    }
+    setShowIndeksJasaModal(false);
+  };
+
+  const handleDeleteIndeksJasa = async (id: string) => {
+    if (confirm('Hapus item Indeks Jasa Langsung ini?')) {
+      try {
+        await supabase.from('indeks_jasa_langsung').delete().eq('id', id);
+      } catch (err) {}
+      updateIndeksJasaList(currentIndeksJasaList.filter(i => i.id !== id));
+    }
+  };
+
+  const handleSaveHeaderAndFormula = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateHeaderConfig(tempHeaderConfig);
+    setShowFormulaHeaderModal(false);
   };
 
   return (
@@ -219,7 +424,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
         </div>
 
         {/* Database Metric Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-6 pt-6 border-t border-blue-900/60">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-6 pt-6 border-t border-blue-900/60">
           <div 
             onClick={() => setActiveSubTab('general')}
             className={`cursor-pointer p-4 rounded-2xl border transition-all ${
@@ -279,6 +484,26 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
               {revenueCenterList.length} Unit Layanan Klinis
             </p>
           </div>
+
+          <div 
+            onClick={() => setActiveSubTab('indeks_jasa')}
+            className={`cursor-pointer p-4 rounded-2xl border transition-all ${
+              activeSubTab === 'indeks_jasa' 
+                ? 'bg-amber-950/70 border-amber-400 shadow-lg shadow-amber-950/50' 
+                : 'bg-[#0b142b]/80 border-blue-900/60 hover:border-blue-700'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold uppercase text-blue-300">4. INDEKS JASA LANGSUNG</span>
+              <Stethoscope className="w-4 h-4 text-amber-400" />
+            </div>
+            <p className="text-xl sm:text-2xl font-black text-white mt-1 truncate">
+              {formatRupiah(currentIndeksJasaList.reduce((acc, c) => acc + evaluateJpFormula(c, currentHeaderConfig.formulaJpLangsung), 0))}
+            </p>
+            <p className="text-[11px] text-amber-300 mt-0.5 font-semibold">
+              {currentIndeksJasaList.length} Instalasi & Layanan
+            </p>
+          </div>
         </div>
       </div>
 
@@ -287,10 +512,10 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           
           {/* Sub-Tabs Button Group */}
-          <div className="flex items-center space-x-1 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+          <div className="flex items-center space-x-1 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto custom-scrollbar">
             <button
               onClick={() => setActiveSubTab('general')}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+              className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 shrink-0 ${
                 activeSubTab === 'general'
                   ? 'bg-gradient-to-r from-blue-700 to-blue-600 text-white shadow'
                   : 'text-slate-400 hover:text-white'
@@ -302,7 +527,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
 
             <button
               onClick={() => setActiveSubTab('cost')}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+              className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 shrink-0 ${
                 activeSubTab === 'cost'
                   ? 'bg-blue-900 text-white shadow'
                   : 'text-slate-400 hover:text-white'
@@ -314,7 +539,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
 
             <button
               onClick={() => setActiveSubTab('revenue')}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+              className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 shrink-0 ${
                 activeSubTab === 'revenue'
                   ? 'bg-emerald-900 text-white shadow'
                   : 'text-slate-400 hover:text-white'
@@ -323,9 +548,21 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
               <TrendingUp className="w-3.5 h-3.5" />
               <span>Revenue Center</span>
             </button>
+
+            <button
+              onClick={() => setActiveSubTab('indeks_jasa')}
+              className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 shrink-0 ${
+                activeSubTab === 'indeks_jasa'
+                  ? 'bg-amber-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Stethoscope className="w-3.5 h-3.5" />
+              <span>Indeks Jasa Langsung</span>
+            </button>
           </div>
 
-          {/* Search and Add Record */}
+          {/* Search, Formula Config & Add Record */}
           <div className="flex items-center space-x-2 sm:space-x-3">
             <div className="relative flex-1 sm:w-64">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -338,6 +575,35 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
               />
             </div>
 
+            {activeSubTab === 'indeks_jasa' && canEdit && (
+              <button
+                onClick={() => {
+                  setTempHeaderConfig(currentHeaderConfig);
+                  setShowFormulaHeaderModal(true);
+                }}
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs border border-amber-500/30 transition active:scale-95 shrink-0"
+                title="Kustomisasi Header Kolom & Formula Nilai JP Langsung"
+              >
+                <Sliders className="w-4 h-4 text-amber-400" />
+                <span className="hidden md:inline">Header & Formula</span>
+              </button>
+            )}
+
+            {activeSubTab === 'general' && canEdit && (
+              <button
+                onClick={() => {
+                  if (confirm('Gantikan General Index dengan dataset resmi RSUD lengkap?')) {
+                    setGeneralIndexList(OFFICIAL_GENERAL_INDEX_DATA);
+                  }
+                }}
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-blue-900/80 hover:bg-blue-800 text-blue-200 border border-blue-700 font-bold text-xs transition active:scale-95 shrink-0"
+                title="Muat ulang tabel General Indeks resmi RSUD"
+              >
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span className="hidden sm:inline">Reset Data RSUD</span>
+              </button>
+            )}
+
             {canEdit && (
               <button
                 onClick={() => {
@@ -347,9 +613,25 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
                   } else if (activeSubTab === 'cost') {
                     setEditingCost(null);
                     setShowCostModal(true);
-                  } else {
+                  } else if (activeSubTab === 'revenue') {
                     setEditingRevenue(null);
                     setShowRevenueModal(true);
+                  } else if (activeSubTab === 'indeks_jasa') {
+                    setEditingIndeksJasa(null);
+                    setIndeksJasaForm({
+                      kode: `IJL-00${currentIndeksJasaList.length + 1}`,
+                      instalasiLayanan: 'Instalasi Gawat Darurat (IGD)',
+                      kategori: 'Pelayanan Medis',
+                      kinerja1: 100,
+                      kinerja2: 80,
+                      kinerja3: 85,
+                      totalPoin: 265,
+                      jumlahAlokasi: 150000000,
+                      rupiahPerPoin1: 150000,
+                      rupiahPerPoin2: 120000,
+                      nilaiJpLangsung: 0
+                    });
+                    setShowIndeksJasaModal(true);
                   }
                 }}
                 className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition active:scale-95 shrink-0"
@@ -577,6 +859,125 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
           </div>
         )}
 
+        {/* TAB 4: INDEKS JASA LANGSUNG TABLE */}
+        {activeSubTab === 'indeks_jasa' && (
+          <div className="space-y-4">
+            {/* Active Formula Banner */}
+            <div className="bg-[#0b162c] border border-amber-500/30 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs shadow-inner">
+              <div className="flex items-start space-x-3">
+                <div className="p-2 rounded-xl bg-amber-400/20 text-amber-300 shrink-0 mt-0.5">
+                  <Calculator className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-extrabold text-white text-xs uppercase tracking-wider">Formula Aritmatika Nilai JP Langsung (Customized)</span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">LIVE FORMULA</span>
+                  </div>
+                  <p className="font-mono text-amber-300 text-xs font-bold mt-1 bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 inline-block">
+                    {currentHeaderConfig.headerNilaiJpLangsung} = {currentHeaderConfig.formulaJpLangsung}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Header & formula dapat dikustomisasi secara interaktif. Nilai JP dihitung otomatis secara langsung per instalasi/layanan.
+                  </p>
+                </div>
+              </div>
+
+              {canEdit && (
+                <button
+                  onClick={() => {
+                    setTempHeaderConfig(currentHeaderConfig);
+                    setShowFormulaHeaderModal(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-lg transition flex items-center space-x-1.5 shrink-0 self-start md:self-center"
+                >
+                  <Sliders className="w-4 h-4" />
+                  <span>Ubah Formula / Header</span>
+                </button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-800">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Instalasi & Layanan</th>
+                    <th className="py-3.5 px-3 text-center whitespace-nowrap">{currentHeaderConfig.headerKinerja1}</th>
+                    <th className="py-3.5 px-3 text-center whitespace-nowrap">{currentHeaderConfig.headerKinerja2}</th>
+                    <th className="py-3.5 px-3 text-center whitespace-nowrap">{currentHeaderConfig.headerKinerja3}</th>
+                    <th className="py-3.5 px-3 text-center font-bold text-blue-300 whitespace-nowrap">{currentHeaderConfig.headerTotalPoin}</th>
+                    <th className="py-3.5 px-4 text-right whitespace-nowrap">{currentHeaderConfig.headerJumlahAlokasi}</th>
+                    <th className="py-3.5 px-3 text-right whitespace-nowrap">{currentHeaderConfig.headerRupiahPerPoin1}</th>
+                    <th className="py-3.5 px-3 text-right whitespace-nowrap">{currentHeaderConfig.headerRupiahPerPoin2}</th>
+                    <th className="py-3.5 px-4 text-right font-black text-amber-300 bg-amber-950/30 whitespace-nowrap border-l border-amber-900/50">
+                      {currentHeaderConfig.headerNilaiJpLangsung}
+                    </th>
+                    {canEdit && <th className="py-3.5 px-3 text-center whitespace-nowrap">Aksi</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                  {filteredIndeksJasa.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-8 text-center text-slate-400">
+                        Tidak ada data Indeks Jasa Langsung yang sesuai kriteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredIndeksJasa.map((item) => {
+                      const calculatedJp = evaluateJpFormula(item, currentHeaderConfig.formulaJpLangsung);
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-800/40 transition">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-white text-xs sm:text-sm">{item.instalasiLayanan}</div>
+                            <div className="text-[10px] text-slate-400 font-mono flex items-center space-x-2">
+                              <span>{item.kode}</span>
+                              <span>•</span>
+                              <span className="px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 border border-slate-700">{item.kategori}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono text-slate-300">{formatNumber(item.kinerja1)}</td>
+                          <td className="py-3 px-3 text-center font-mono text-slate-300">{formatNumber(item.kinerja2)}</td>
+                          <td className="py-3 px-3 text-center font-mono text-slate-300">{formatNumber(item.kinerja3)}</td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-blue-300 bg-blue-950/20">{formatNumber(item.totalPoin)}</td>
+                          <td className="py-3 px-4 text-right font-mono text-slate-300">{formatRupiah(item.jumlahAlokasi)}</td>
+                          <td className="py-3 px-3 text-right font-mono text-slate-400">{formatRupiah(item.rupiahPerPoin1)}</td>
+                          <td className="py-3 px-3 text-right font-mono text-slate-400">{formatRupiah(item.rupiahPerPoin2)}</td>
+                          <td className="py-3 px-4 text-right font-mono font-black text-amber-300 bg-amber-950/30 text-sm border-l border-amber-900/50">
+                            {formatRupiah(calculatedJp)}
+                          </td>
+                          {canEdit && (
+                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center space-x-1">
+                                <button
+                                  onClick={() => {
+                                    setEditingIndeksJasa(item);
+                                    setIndeksJasaForm(item);
+                                    setShowIndeksJasaModal(true);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                                  title="Ubah Data Indeks Jasa"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteIndeksJasa(item.id)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
+                                  title="Hapus Data Indeks Jasa"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* MODAL 1: ADD/EDIT GENERAL INDEX */}
@@ -741,26 +1142,18 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Anggaran Bulanan (Rp)</label>
-                  <input
-                    type="number"
-                    step="1000000"
-                    value={costForm.alokasiAnggaranBulanan}
-                    onChange={e => setCostForm({ ...costForm, alokasiAnggaranBulanan: Number(e.target.value) })}
-                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Realisasi Biaya (Rp)</label>
-                  <input
-                    type="number"
-                    step="1000000"
-                    value={costForm.realisasiBiaya}
-                    onChange={e => setCostForm({ ...costForm, realisasiBiaya: Number(e.target.value) })}
-                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-rose-400 font-mono font-bold"
-                  />
-                </div>
+                <CurrencyInput
+                  label="Anggaran Bulanan (Rp)"
+                  value={costForm.alokasiAnggaranBulanan}
+                  onChange={val => setCostForm({ ...costForm, alokasiAnggaranBulanan: val })}
+                  placeholder="25000000"
+                />
+                <CurrencyInput
+                  label="Realisasi Biaya (Rp)"
+                  value={costForm.realisasiBiaya}
+                  onChange={val => setCostForm({ ...costForm, realisasiBiaya: val })}
+                  placeholder="21000000"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -821,26 +1214,18 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Target Pendapatan (Rp)</label>
-                  <input
-                    type="number"
-                    step="1000000"
-                    value={revenueForm.targetPendapatanBulanan}
-                    onChange={e => setRevenueForm({ ...revenueForm, targetPendapatanBulanan: Number(e.target.value) })}
-                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Realisasi Pendapatan (Rp)</label>
-                  <input
-                    type="number"
-                    step="1000000"
-                    value={revenueForm.realisasiPendapatan}
-                    onChange={e => setRevenueForm({ ...revenueForm, realisasiPendapatan: Number(e.target.value) })}
-                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-mono font-bold"
-                  />
-                </div>
+                <CurrencyInput
+                  label="Target Pendapatan (Rp)"
+                  value={revenueForm.targetPendapatanBulanan}
+                  onChange={val => setRevenueForm({ ...revenueForm, targetPendapatanBulanan: val })}
+                  placeholder="650000000"
+                />
+                <CurrencyInput
+                  label="Realisasi Pendapatan (Rp)"
+                  value={revenueForm.realisasiPendapatan}
+                  onChange={val => setRevenueForm({ ...revenueForm, realisasiPendapatan: val })}
+                  placeholder="720000000"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -869,6 +1254,405 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
               <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
                 <button type="button" onClick={() => setShowRevenueModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold">Batal</button>
                 <button type="submit" className="px-5 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-500">Simpan Revenue</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: ADD/EDIT INDEKS JASA LANGSUNG */}
+      {showIndeksJasaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-xl bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl space-y-4 my-auto max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <Stethoscope className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-black text-white">
+                  {editingIndeksJasa ? 'Ubah Data Indeks Jasa Langsung' : 'Tambah Indeks Jasa Langsung Baru'}
+                </h3>
+              </div>
+              <button onClick={() => setShowIndeksJasaModal(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveIndeksJasa} className="space-y-3 text-xs">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Kode / ID</label>
+                  <input
+                    type="text"
+                    required
+                    value={indeksJasaForm.kode}
+                    onChange={e => setIndeksJasaForm({ ...indeksJasaForm, kode: e.target.value })}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Kategori Layanan</label>
+                  <select
+                    value={indeksJasaForm.kategori}
+                    onChange={e => setIndeksJasaForm({ ...indeksJasaForm, kategori: e.target.value })}
+                    className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-amber-300 font-bold"
+                  >
+                    <option value="Pelayanan Medis">Pelayanan Medis</option>
+                    <option value="Pelayanan Keperawatan">Pelayanan Keperawatan</option>
+                    <option value="Pelayanan Penunjang">Pelayanan Penunjang</option>
+                    <option value="Spesialis / Subspesialis">Spesialis / Subspesialis</option>
+                    <option value="Layanan Khusus Jiwa / Psikiatri">Layanan Khusus Jiwa / Psikiatri</option>
+                    <option value="Manajemen & Ketenagaan">Manajemen & Ketenagaan</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase text-[10px] font-bold mb-1">Nama Instalasi & Layanan</label>
+                <input
+                  type="text"
+                  required
+                  value={indeksJasaForm.instalasiLayanan}
+                  onChange={e => setIndeksJasaForm({ ...indeksJasaForm, instalasiLayanan: e.target.value })}
+                  placeholder="Contoh: Instalasi Rawat Jalan (IRJ) Spesialis"
+                  className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold"
+                />
+              </div>
+
+              {/* Dynamic Kinerja inputs */}
+              <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+                <div className="text-[11px] font-extrabold text-blue-300 uppercase tracking-wider flex items-center justify-between">
+                  <span>Input Nilai Kinerja ({currentHeaderConfig.headerTotalPoin})</span>
+                  <span className="text-amber-400 font-mono">Poin = Kinerja 1+2+3</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold mb-1 truncate">{currentHeaderConfig.headerKinerja1}</label>
+                    <input
+                      type="number"
+                      required
+                      value={indeksJasaForm.kinerja1}
+                      onChange={e => {
+                        const val = Number(e.target.value) || 0;
+                        setIndeksJasaForm(prev => ({
+                          ...prev,
+                          kinerja1: val,
+                          totalPoin: val + prev.kinerja2 + prev.kinerja3
+                        }));
+                      }}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono text-center font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold mb-1 truncate">{currentHeaderConfig.headerKinerja2}</label>
+                    <input
+                      type="number"
+                      required
+                      value={indeksJasaForm.kinerja2}
+                      onChange={e => {
+                        const val = Number(e.target.value) || 0;
+                        setIndeksJasaForm(prev => ({
+                          ...prev,
+                          kinerja2: val,
+                          totalPoin: prev.kinerja1 + val + prev.kinerja3
+                        }));
+                      }}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono text-center font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold mb-1 truncate">{currentHeaderConfig.headerKinerja3}</label>
+                    <input
+                      type="number"
+                      required
+                      value={indeksJasaForm.kinerja3}
+                      onChange={e => {
+                        const val = Number(e.target.value) || 0;
+                        setIndeksJasaForm(prev => ({
+                          ...prev,
+                          kinerja3: val,
+                          totalPoin: prev.kinerja1 + prev.kinerja2 + val
+                        }));
+                      }}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono text-center font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">{currentHeaderConfig.headerTotalPoin}</span>
+                  <input
+                    type="number"
+                    value={indeksJasaForm.totalPoin}
+                    onChange={e => setIndeksJasaForm({ ...indeksJasaForm, totalPoin: Number(e.target.value) || 0 })}
+                    className="w-32 p-1.5 bg-slate-900 border border-blue-500/40 rounded-lg text-blue-300 font-mono text-right font-black"
+                  />
+                </div>
+              </div>
+
+              {/* Alokasi & Rupiah Per Poin */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <CurrencyInput
+                  label={currentHeaderConfig.headerJumlahAlokasi}
+                  value={indeksJasaForm.jumlahAlokasi}
+                  onChange={val => setIndeksJasaForm({ ...indeksJasaForm, jumlahAlokasi: val })}
+                  placeholder="250000000"
+                />
+                <CurrencyInput
+                  label={currentHeaderConfig.headerRupiahPerPoin1}
+                  value={indeksJasaForm.rupiahPerPoin1}
+                  onChange={val => setIndeksJasaForm({ ...indeksJasaForm, rupiahPerPoin1: val })}
+                  placeholder="150000"
+                />
+                <CurrencyInput
+                  label={currentHeaderConfig.headerRupiahPerPoin2}
+                  value={indeksJasaForm.rupiahPerPoin2}
+                  onChange={val => setIndeksJasaForm({ ...indeksJasaForm, rupiahPerPoin2: val })}
+                  placeholder="120000"
+                />
+              </div>
+
+              {/* Calculated Value Box */}
+              <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/30 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-300 block">{currentHeaderConfig.headerNilaiJpLangsung} (Hasil Evaluasi)</span>
+                  <span className="text-[10px] text-slate-400 font-mono">Formula: {currentHeaderConfig.formulaJpLangsung}</span>
+                </div>
+                <span className="text-base font-black text-amber-300 font-mono">
+                  {formatRupiah(evaluateJpFormula(indeksJasaForm, currentHeaderConfig.formulaJpLangsung))}
+                </span>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+                <button type="button" onClick={() => setShowIndeksJasaModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold">Batal</button>
+                <button type="submit" className="px-5 py-2 rounded-xl bg-amber-400 text-slate-950 font-bold hover:bg-amber-300">Simpan Indeks Jasa</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: HEADER & FORMULA CUSTOMIZER MODAL */}
+      {showFormulaHeaderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl space-y-5 my-auto max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <Sliders className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h3 className="text-base font-black text-white">
+                    Kustomisasi Header Kolom & Formula JP Langsung
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Atur nama label kolom dan rumus aritmatika secara interaktif.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowFormulaHeaderModal(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveHeaderAndFormula} className="space-y-4 text-xs">
+              
+              {/* SECTION A: HEADER LABELS */}
+              <div className="bg-slate-950/90 p-4 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-amber-300 uppercase text-[11px] tracking-wider flex items-center space-x-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>1. Kustomisasi Label Header Kolom</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500">Bisa diubah sesuai istilah internal RS</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold mb-1">Header Kinerja 1</label>
+                    <input
+                      type="text"
+                      value={tempHeaderConfig.headerKinerja1}
+                      onChange={e => setTempHeaderConfig({ ...tempHeaderConfig, headerKinerja1: e.target.value })}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold mb-1">Header Kinerja 2</label>
+                    <input
+                      type="text"
+                      value={tempHeaderConfig.headerKinerja2}
+                      onChange={e => setTempHeaderConfig({ ...tempHeaderConfig, headerKinerja2: e.target.value })}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold mb-1">Header Kinerja 3</label>
+                    <input
+                      type="text"
+                      value={tempHeaderConfig.headerKinerja3}
+                      onChange={e => setTempHeaderConfig({ ...tempHeaderConfig, headerKinerja3: e.target.value })}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold mb-1">Header Total Poin</label>
+                    <input
+                      type="text"
+                      value={tempHeaderConfig.headerTotalPoin}
+                      onChange={e => setTempHeaderConfig({ ...tempHeaderConfig, headerTotalPoin: e.target.value })}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold mb-1">Header Jumlah Alokasi</label>
+                    <input
+                      type="text"
+                      value={tempHeaderConfig.headerJumlahAlokasi}
+                      onChange={e => setTempHeaderConfig({ ...tempHeaderConfig, headerJumlahAlokasi: e.target.value })}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold mb-1">Header Rp / Poin 1</label>
+                    <input
+                      type="text"
+                      value={tempHeaderConfig.headerRupiahPerPoin1}
+                      onChange={e => setTempHeaderConfig({ ...tempHeaderConfig, headerRupiahPerPoin1: e.target.value })}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-bold mb-1">Header Rp / Poin 2</label>
+                    <input
+                      type="text"
+                      value={tempHeaderConfig.headerRupiahPerPoin2}
+                      onChange={e => setTempHeaderConfig({ ...tempHeaderConfig, headerRupiahPerPoin2: e.target.value })}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-amber-300 text-[10px] font-extrabold mb-1">Header Kolom Nilai JP Langsung</label>
+                    <input
+                      type="text"
+                      value={tempHeaderConfig.headerNilaiJpLangsung}
+                      onChange={e => setTempHeaderConfig({ ...tempHeaderConfig, headerNilaiJpLangsung: e.target.value })}
+                      className="w-full p-2 bg-slate-800 border border-amber-500/50 rounded-xl text-amber-300 font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION B: FORMULA EDITOR */}
+              <div className="bg-slate-950/90 p-4 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-blue-300 uppercase text-[11px] tracking-wider flex items-center space-x-1.5">
+                    <Code className="w-4 h-4 text-blue-400" />
+                    <span>2. Editor Formula Aritmatika Nilai JP Langsung</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-mono font-bold">Variabel: kinerja1, kinerja2, kinerja3, totalPoin, jumlahAlokasi, rupiahPerPoin1, rupiahPerPoin2</span>
+                </div>
+
+                {/* Preset Dropdown */}
+                <div>
+                  <label className="block text-slate-400 text-[10px] font-bold mb-1">Pilih Template Formula Cepat</label>
+                  <select
+                    onChange={e => {
+                      if (e.target.value) {
+                        setTempHeaderConfig({ ...tempHeaderConfig, formulaJpLangsung: e.target.value });
+                      }
+                    }}
+                    className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-xs"
+                  >
+                    <option value="">-- Pilih Template Formula --</option>
+                    <option value="(totalPoin * rupiahPerPoin1) + (jumlahAlokasi * 0.1)">1. Standard: (Total Poin × Rp1) + 10% Jumlah Alokasi</option>
+                    <option value="(kinerja1 * rupiahPerPoin1) + (kinerja2 * rupiahPerPoin2)">2. Multi-Poin: (Kinerja 1 × Rp1) + (Kinerja 2 × Rp2)</option>
+                    <option value="totalPoin * rupiahPerPoin1">3. Murni Poin: Total Poin × Rp / Poin 1</option>
+                    <option value="jumlahAlokasi">4. Murni Alokasi: Jumlah Alokasi Instalasi/Layanan</option>
+                  </select>
+                </div>
+
+                {/* Formula Expression Input */}
+                <div>
+                  <label className="block text-slate-400 text-[10px] font-bold mb-1">Ekspresi Formula (String Aritmatika JS)</label>
+                  <input
+                    type="text"
+                    required
+                    value={tempHeaderConfig.formulaJpLangsung}
+                    onChange={e => setTempHeaderConfig({ ...tempHeaderConfig, formulaJpLangsung: e.target.value })}
+                    placeholder="Contoh: (totalPoin * rupiahPerPoin1) + (jumlahAlokasi * 0.1)"
+                    className="w-full p-3 bg-slate-900 border border-blue-500/60 rounded-xl text-amber-300 font-mono text-xs font-bold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                {/* Quick Variable Insertion Pills */}
+                <div>
+                  <label className="block text-slate-400 text-[10px] font-bold mb-1.5">Klik Variabel / Operator untuk Menyisipkan:</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      'totalPoin',
+                      'rupiahPerPoin1',
+                      'jumlahAlokasi',
+                      'kinerja1',
+                      'kinerja2',
+                      'kinerja3',
+                      'rupiahPerPoin2'
+                    ].map(varName => (
+                      <button
+                        key={varName}
+                        type="button"
+                        onClick={() => {
+                          setTempHeaderConfig(prev => ({
+                            ...prev,
+                            formulaJpLangsung: prev.formulaJpLangsung ? `${prev.formulaJpLangsung} * ${varName}` : varName
+                          }));
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-blue-950 hover:bg-blue-900 text-blue-300 font-mono text-[10px] font-bold border border-blue-800 transition"
+                      >
+                        + {varName}
+                      </button>
+                    ))}
+                    {['+', '-', '*', '/', '(', ')', '0.1', '0.5'].map(op => (
+                      <button
+                        key={op}
+                        type="button"
+                        onClick={() => {
+                          setTempHeaderConfig(prev => ({
+                            ...prev,
+                            formulaJpLangsung: prev.formulaJpLangsung ? `${prev.formulaJpLangsung} ${op} ` : op
+                          }));
+                        }}
+                        className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-mono text-[10px] font-bold border border-slate-700 transition"
+                      >
+                        {op}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live Formula Preview Test */}
+                <div className="p-3.5 rounded-xl bg-[#0a1529] border border-emerald-500/40 space-y-1">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase">
+                    <span className="text-emerald-400">Hasil Pengujian Live Evaluasi Simulasi:</span>
+                    <span className="text-slate-400 font-mono">Sample: Total Poin=295, Rp1=150.000, Alokasi=250.000.000</span>
+                  </div>
+                  <div className="text-sm font-black text-amber-300 font-mono">
+                    = {formatRupiah(evaluateJpFormula({
+                      kinerja1: 120,
+                      kinerja2: 85,
+                      kinerja3: 90,
+                      totalPoin: 295,
+                      jumlahAlokasi: 250000000,
+                      rupiahPerPoin1: 150000,
+                      rupiahPerPoin2: 120000,
+                      nilaiJpLangsung: 0
+                    }, tempHeaderConfig.formulaJpLangsung))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setTempHeaderConfig(DEFAULT_INDEKS_JASA_HEADER_CONFIG)}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold"
+                >
+                  Reset Default
+                </button>
+                <div className="flex space-x-2">
+                  <button type="button" onClick={() => setShowFormulaHeaderModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold">Batal</button>
+                  <button type="submit" className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-extrabold hover:from-amber-400 hover:to-amber-500 shadow-lg">Simpan Formula & Header</button>
+                </div>
               </div>
             </form>
           </div>

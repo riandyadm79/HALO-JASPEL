@@ -30,11 +30,12 @@ import {
   ChevronRight,
   Sun,
   Moon,
-  TrendingUp
+  TrendingUp,
+  Edit2
 } from 'lucide-react';
 import { User, RoleType, InstalasiLayananType } from '../types';
 import { useTheme } from '../context/ThemeContext';
-
+import { HospitalProfile, DEFAULT_HOSPITAL_PROFILE } from './HospitalProfileModal';
 
 interface SidebarProps {
   activeTab: string;
@@ -44,8 +45,10 @@ interface SidebarProps {
   onOpenSyncModal: () => void;
   selectedCategory?: string;
   setSelectedCategory?: (cat: string) => void;
-  dbSubTab?: 'general' | 'cost' | 'revenue';
-  setDbSubTab?: (subTab: 'general' | 'cost' | 'revenue') => void;
+  dbSubTab?: 'general' | 'cost' | 'revenue' | 'indeks_jasa';
+  setDbSubTab?: (subTab: 'general' | 'cost' | 'revenue' | 'indeks_jasa') => void;
+  hospitalProfile?: HospitalProfile;
+  onOpenHospitalProfile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -57,18 +60,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
   selectedCategory = 'all',
   setSelectedCategory,
   dbSubTab = 'general',
-  setDbSubTab
+  setDbSubTab,
+  hospitalProfile = DEFAULT_HOSPITAL_PROFILE,
+  onOpenHospitalProfile
 }) => {
   const { theme, toggleTheme } = useTheme();
 
-  // Pos & Manajemen Alokasi Keuangan (Top 7)
+  // Pos & Manajemen Alokasi Keuangan (Top Items)
   const posKeuangan = [
+    {
+      id: 'rekap-cetak',
+      name: 'Rekap & Cetak Laporan',
+      icon: FileSpreadsheet,
+      type: 'rekap',
+      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[],
+      onClick: () => {
+        setActiveTab('rekap_cetak');
+      },
+      isActive: activeTab === 'rekap_cetak'
+    },
     {
       id: 'alokasi-dana',
       name: 'Alokasi Dana',
       icon: Wallet,
       type: 'alokasi',
-      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[],
+      roles: ['superadmin'] as RoleType[],
       onClick: () => {
         setActiveTab('alokasi');
         if (setSelectedCategory) setSelectedCategory('all');
@@ -76,11 +92,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       isActive: activeTab === 'alokasi' && selectedCategory === 'all'
     },
     {
+      id: 'visualisasi-tren',
+      name: 'Visualisasi & Tren',
+      icon: TrendingUp,
+      type: 'visualisasi',
+      roles: ['superadmin'] as RoleType[],
+      onClick: () => {
+        setActiveTab('visualisasi');
+      },
+      isActive: activeTab === 'visualisasi'
+    },
+    {
       id: 'indeks-pegawai',
       name: 'Indeks Pegawai',
       icon: BadgeCheck,
       type: 'database',
-      roles: ['superadmin', 'perumus', 'pic'] as RoleType[],
+      roles: ['superadmin'] as RoleType[],
       onClick: () => {
         setActiveTab('database');
         if (setDbSubTab) setDbSubTab('general');
@@ -92,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       name: 'Post Remunerasi',
       icon: Receipt,
       type: 'database',
-      roles: ['superadmin', 'perumus', 'pic'] as RoleType[],
+      roles: ['superadmin'] as RoleType[],
       onClick: () => {
         setActiveTab('database');
         if (setDbSubTab) setDbSubTab('revenue');
@@ -104,7 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       name: 'Beban Tetap',
       icon: Calculator,
       type: 'database',
-      roles: ['superadmin', 'perumus', 'pic'] as RoleType[],
+      roles: ['superadmin'] as RoleType[],
       onClick: () => {
         setActiveTab('database');
         if (setDbSubTab) setDbSubTab('cost');
@@ -112,11 +139,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
       isActive: activeTab === 'database' && dbSubTab === 'cost'
     },
     {
+      id: 'indeks-jasa-langsung',
+      name: 'Indeks Jasa Langsung',
+      icon: Stethoscope,
+      type: 'database',
+      roles: ['superadmin', 'perumus', 'direktur', 'keuangan', 'input_medis', 'input_perawat', 'input_nakes_lain', 'input_psikiatri', 'input_spesialis'] as RoleType[],
+      onClick: () => {
+        setActiveTab('database');
+        if (setDbSubTab) setDbSubTab('indeks_jasa');
+      },
+      isActive: activeTab === 'database' && dbSubTab === 'indeks_jasa'
+    },
+    {
       id: 'pengelola-blud',
       name: 'Pengelola BLUD',
       icon: UserCheck,
       type: 'instalasi',
-      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[],
+      roles: ['superadmin'] as RoleType[],
       onClick: () => {
         setActiveTab('alokasi');
         if (setSelectedCategory) setSelectedCategory('Pengelola BLUD');
@@ -128,7 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       name: 'Dewan Pengawas',
       icon: Scale,
       type: 'instalasi',
-      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[],
+      roles: ['superadmin'] as RoleType[],
       onClick: () => {
         setActiveTab('alokasi');
         if (setSelectedCategory) setSelectedCategory('Dewan Pengawas');
@@ -140,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       name: 'Tugas Tambahan',
       icon: ListChecks,
       type: 'instalasi',
-      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[],
+      roles: ['superadmin'] as RoleType[],
       onClick: () => {
         setActiveTab('alokasi');
         if (setSelectedCategory) setSelectedCategory('Tugas Tambahan');
@@ -196,42 +235,65 @@ export const Sidebar: React.FC<SidebarProps> = ({
       onClick: () => setActiveTab('supabase')
     },
     {
-      id: 'export',
+      id: 'export-import',
       label: 'Ekspor & Impor (XLSX, PDF)',
       icon: FileSpreadsheet,
       roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[],
-      isActive: activeTab === 'export',
-      onClick: () => setActiveTab('export')
+      isActive: activeTab === 'export' || activeTab === 'export-import',
+      onClick: () => setActiveTab('export-import')
     }
   ];
 
+  const getDotBg = (color?: HospitalProfile['badgeColor']) => {
+    switch (color) {
+      case 'emerald': return 'bg-emerald-500';
+      case 'blue': return 'bg-blue-500';
+      case 'rose': return 'bg-rose-500';
+      case 'purple': return 'bg-purple-500';
+      case 'amber':
+      default: return 'bg-amber-400';
+    }
+  };
+
   return (
-    <aside className={`w-64 xl:w-72 flex flex-col justify-between hidden lg:flex shrink-0 transition-colors duration-200 border-r ${
+    <aside className={`w-64 xl:w-72 flex flex-col justify-between hidden lg:flex shrink-0 transition-colors duration-200 border-r sticky top-20 h-[calc(100vh-80px)] ${
       theme === 'light'
         ? 'bg-white border-slate-200 text-slate-900 shadow-sm'
         : 'bg-[#0c152d] border-blue-900/60 text-slate-100'
     }`}>
       
       {/* Scrollable Navigation List */}
-      <div className="p-3.5 space-y-4 overflow-y-auto max-h-[calc(100vh-80px)] custom-scrollbar">
+      <div className="p-3.5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         
-        {/* Hospital Card */}
-        <div className={`p-3.5 rounded-2xl border shadow-md transition-all ${
-          theme === 'light'
-            ? 'bg-gradient-to-br from-blue-50 via-indigo-50/50 to-slate-50 border-blue-200 text-slate-900'
-            : 'bg-gradient-to-br from-[#1e3a8a]/70 via-[#172554]/80 to-[#0b1329] border-blue-700/40 text-white'
-        }`}>
-          <div className="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-wider mb-1">
-            <span className={`w-2 h-2 rounded-full ${theme === 'light' ? 'bg-emerald-500' : 'bg-amber-400'} animate-pulse`}></span>
-            <span className={theme === 'light' ? 'text-blue-800 font-extrabold' : 'text-amber-400 font-extrabold'}>
-              BLUD TERDAFTAR
+        {/* Hospital Profile Card (Image 2 - Clickable & Customizable) */}
+        <div 
+          onClick={onOpenHospitalProfile}
+          className={`p-3.5 rounded-2xl border shadow-md transition-all cursor-pointer group relative ${
+            theme === 'light'
+              ? 'bg-gradient-to-br from-blue-50 via-indigo-50/50 to-slate-50 border-blue-200 text-slate-900 hover:border-blue-400 hover:shadow-lg'
+              : 'bg-gradient-to-br from-[#1e3a8a]/70 via-[#172554]/80 to-[#0b1329] border-blue-700/40 text-white hover:border-amber-400 hover:shadow-blue-950/60'
+          }`}
+          title="Klik untuk kustomisasi Nama RSUD & Status BLUD"
+        >
+          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mb-1">
+            <div className="flex items-center space-x-1.5">
+              <span className={`w-2 h-2 rounded-full ${getDotBg(hospitalProfile.badgeColor)} animate-pulse`}></span>
+              <span className={theme === 'light' ? 'text-blue-900 font-extrabold' : 'text-amber-400 font-extrabold'}>
+                {hospitalProfile.badgeText || 'BLUD TERDAFTAR'}
+              </span>
+            </div>
+
+            <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-amber-400 font-bold flex items-center gap-0.5">
+              <Edit2 className="w-3 h-3" />
+              <span>Edit</span>
             </span>
           </div>
+
           <p className={`text-xs font-black leading-tight ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>
-            RSUD / BLUD SEHAT SENTOSA
+            {hospitalProfile.hospitalName || 'RSUD / BLUD SEHAT SENTOSA'}
           </p>
-          <p className={`text-[10px] font-medium mt-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-blue-200/90'}`}>
-            Sistem Jaspel & Remunerasi 2026
+          <p className={`text-[10px] font-medium mt-0.5 ${theme === 'light' ? 'text-slate-700' : 'text-blue-200/90'}`}>
+            {hospitalProfile.subtitle || 'Sistem Jaspel & Remunerasi 2026'}
           </p>
         </div>
 
@@ -243,10 +305,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Pos & Kebijakan</span>
             <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${
               theme === 'light'
-                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                ? 'bg-blue-50 text-blue-900 border-blue-300'
                 : 'bg-blue-950 text-amber-300 border-blue-800'
             }`}>
-              7 POS
+              9 MENU
             </span>
           </div>
 
@@ -304,7 +366,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Instalasi & Layanan</span>
             <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${
               theme === 'light'
-                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                ? 'bg-blue-50 text-blue-900 border-blue-300'
                 : 'bg-blue-950 text-amber-300 border-blue-800'
             }`}>
               16 UNIT
@@ -327,7 +389,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     isSelected
                       ? 'bg-blue-600 text-white font-bold shadow-sm border border-blue-400/40'
                       : theme === 'light'
-                      ? 'text-slate-700 font-medium hover:bg-slate-100 hover:text-blue-900'
+                      ? 'text-slate-800 font-semibold hover:bg-slate-100 hover:text-blue-900'
                       : 'text-slate-200 font-medium hover:bg-blue-950/60 hover:text-white'
                   }`}
                 >
@@ -336,7 +398,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       isSelected 
                         ? 'bg-white/20 text-white' 
                         : theme === 'light'
-                        ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                        ? 'bg-slate-100 text-slate-700 border border-slate-200'
                         : 'bg-blue-950/60 text-blue-300'
                     }`}>
                       <Icon className="w-3.5 h-3.5" />
@@ -355,12 +417,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* SECTION 3: Modul & Konfigurasi */}
-        <div className={`space-y-1 pt-2 border-t ${theme === 'light' ? 'border-slate-200' : 'border-blue-900/40'}`}>
-          <div className={`px-2 pb-1 text-[10px] font-black tracking-widest uppercase ${
+        {/* SECTION 3: System & Tools */}
+        <div className="space-y-1 pt-1">
+          <div className={`px-2 pb-1 text-[10px] font-black tracking-widest uppercase flex items-center justify-between ${
             theme === 'light' ? 'text-slate-700' : 'text-blue-300'
           }`}>
-            Pengaturan Sistem
+            <span>Sistem & Integrasi</span>
+            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${
+              theme === 'light'
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                : 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+            }`}>
+              CLOUD
+            </span>
           </div>
 
           <div className="space-y-0.5">
@@ -373,35 +442,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   key={tool.id}
                   onClick={() => isAllowed && tool.onClick()}
                   disabled={!isAllowed}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all ${
+                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-left transition-all ${
                     tool.isActive
-                      ? 'bg-gradient-to-r from-blue-700 to-blue-600 text-white font-bold border border-blue-400/40'
+                      ? 'bg-blue-600 text-white font-bold shadow-sm'
                       : isAllowed
                       ? theme === 'light'
                         ? 'text-slate-800 font-semibold hover:bg-slate-100 hover:text-blue-900'
-                        : 'text-slate-100 font-semibold hover:bg-blue-950/70 hover:text-white'
-                      : theme === 'light'
-                      ? 'text-slate-400 cursor-not-allowed opacity-50'
-                      : 'text-slate-600 cursor-not-allowed opacity-40'
+                        : 'text-slate-300 font-medium hover:bg-blue-950/60 hover:text-white'
+                      : 'text-slate-400 cursor-not-allowed opacity-40'
                   }`}
                 >
                   <div className="flex items-center space-x-2.5 min-w-0">
-                    <div className={`p-1.5 rounded-lg transition-colors ${
+                    <div className={`p-1 rounded-md ${
                       tool.isActive 
-                        ? 'bg-amber-400 text-blue-950' 
+                        ? 'bg-white/20 text-white' 
                         : theme === 'light'
-                        ? 'bg-slate-100 text-amber-700 border border-slate-200'
-                        : 'bg-blue-950 text-amber-400'
+                        ? 'bg-slate-100 text-slate-700'
+                        : 'bg-blue-950/60 text-blue-300'
                     }`}>
-                      <Icon className="w-4 h-4" />
+                      <Icon className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-xs truncate font-medium">{tool.label}</span>
+                    <span className="text-xs truncate">{tool.label}</span>
                   </div>
 
-                  {!isAllowed ? (
-                    <Lock className="w-3 h-3 text-slate-400" />
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  {tool.id === 'supabase' && rlsEnabled && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                   )}
                 </button>
               );
@@ -411,73 +476,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       </div>
 
-      {/* Cloud & System Widget */}
-      <div className={`p-3 border-t space-y-2 transition-colors ${
-        theme === 'light' 
-          ? 'bg-slate-50 border-slate-200' 
-          : 'bg-[#0a1126] border-blue-900/60'
+      {/* Footer Profile Status */}
+      <div className={`p-3 border-t text-xs ${
+        theme === 'light' ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950/80 border-blue-900/60 text-slate-400'
       }`}>
-        {/* Theme Switcher Toggle */}
-        <button 
-          onClick={toggleTheme}
-          className={`w-full p-2.5 rounded-xl border transition flex items-center justify-between group ${
-            theme === 'light'
-              ? 'bg-white hover:bg-slate-100 border-slate-200 text-slate-900'
-              : 'bg-blue-950/40 hover:bg-blue-900/50 border-blue-800/60 text-white'
-          }`}
-          title="Klik untuk mengganti mode tema"
-        >
-          <div className="flex items-center space-x-2">
-            {theme === 'light' ? (
-              <Sun className="w-4 h-4 text-amber-600" />
-            ) : (
-              <Moon className="w-4 h-4 text-amber-400" />
-            )}
-            <div className="text-left">
-              <p className={`text-[11px] font-bold leading-none ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>
-                {theme === 'light' ? 'Mode Terang (Light)' : 'Mode Gelap (Navy)'}
-              </p>
-              <p className={`text-[9px] mt-0.5 ${theme === 'light' ? 'text-slate-500' : 'text-blue-200/70'}`}>
-                {theme === 'light' ? 'Tema profesional cerah' : 'Tema eksekutif navy'}
-              </p>
-            </div>
-          </div>
-          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${
-            theme === 'light' 
-              ? 'bg-amber-100 text-amber-900 border-amber-300' 
-              : 'bg-blue-900 text-amber-300 border-blue-700'
-          }`}>
-            {theme === 'light' ? 'LIGHT' : 'DARK'}
-          </span>
-        </button>
-
-        <div 
-          onClick={onOpenSyncModal}
-          className={`p-2.5 rounded-xl border cursor-pointer transition flex items-center justify-between ${
-            theme === 'light'
-              ? 'bg-white hover:bg-slate-100 border-slate-200'
-              : 'bg-blue-950/60 hover:border-amber-400/70 border-blue-800/80'
-          }`}
-        >
-          <div className="flex items-center space-x-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <div>
-              <p className={`text-[11px] font-bold leading-none ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>
-                Supabase Sync
-              </p>
-              <p className={`text-[9px] mt-0.5 ${theme === 'light' ? 'text-slate-500' : 'text-blue-200/70'}`}>
-                {rlsEnabled ? 'RLS Aktif (Aman)' : 'RLS Dinonaktifkan'}
-              </p>
-            </div>
-          </div>
-          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${
-            theme === 'light'
-              ? 'bg-blue-50 text-blue-700 border-blue-200'
-              : 'bg-blue-900 text-amber-300 border-blue-700'
-          }`}>
-            SYNC
+        <div className="flex items-center justify-between mb-1">
+          <span className="font-bold truncate text-[11px]">{currentUser?.nama || 'Pengguna'}</span>
+          <span className="text-[9px] uppercase px-1.5 py-0.5 bg-blue-900 text-blue-200 rounded font-bold">
+            {currentUser?.role || 'staf'}
           </span>
         </div>
+        <p className="text-[10px] text-slate-500 truncate">{currentUser?.jabatan || 'Staf Rumah Sakit'}</p>
       </div>
 
     </aside>

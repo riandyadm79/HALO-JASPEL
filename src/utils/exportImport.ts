@@ -112,12 +112,17 @@ export const exportToCSV = (data: Record<string, unknown>[], filename: string) =
 };
 
 // 3. EXPORT TO PLAIN TEXT (Dot-Matrix & WhatsApp friendly)
-export const exportToTextSummary = (alokasi: AlokasiJaspel, penerima: PenerimaAlokasi[]): string => {
+export const exportToTextSummary = (
+  alokasi: AlokasiJaspel, 
+  penerima: PenerimaAlokasi[],
+  instansiName: string = 'INSTANSI RSUD / BLUD'
+): string => {
   const line = '='.repeat(68);
   const dash = '-'.repeat(68);
 
   let text = `${line}\n`;
-  text += `        HALO JASPEL - LAPORAN ALOKASI JASA PELAYANAN RSUD / BLUD\n`;
+  text += `        ${instansiName.toUpperCase()}\n`;
+  text += `        LAPORAN ALOKASI JASA PELAYANAN (JASPEL)\n`;
   text += `${line}\n`;
   text += `Kode Periode        : ${alokasi.kodePeriode}\n`;
   text += `Bulan / Tahun       : ${alokasi.bulan} ${alokasi.tahun}\n`;
@@ -151,7 +156,7 @@ export const exportToTextSummary = (alokasi: AlokasiJaspel, penerima: PenerimaAl
   text += `TOTAL NETTO PENERIMA     : ${formatRupiah(totalNetto)}\n`;
   text += `PENANGGUNG JAWAB         : ${alokasi.createdBy}\n`;
   text += `${line}\n`;
-  text += `* Dokumen ini dibuat otomatis oleh Sistem Informasi HALO JASPEL\n`;
+  text += `* Dokumen ini dibuat otomatis oleh Sistem Informasi Remunerasi & Alokasi Jaspel\n`;
 
   return text;
 };
@@ -160,7 +165,9 @@ export const exportToTextSummary = (alokasi: AlokasiJaspel, penerima: PenerimaAl
 export const exportSlipPdf = (
   p: PenerimaAlokasi,
   alokasi: AlokasiJaspel,
-  instansiName: string = 'RSUD / BLUD SEHAT SENTOSA'
+  instansiName: string = 'INSTANSI RSUD / BLUD',
+  committeeLeadName: string = 'dr. H. Hendra Setiawan, Sp.B',
+  committeeLeadNip: string = '19780512 200312 1 002'
 ) => {
   const doc = new jsPDF();
 
@@ -300,10 +307,10 @@ export const exportSlipPdf = (
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.text('drg. Ratna Kartika, Sp.KGA', 130, y);
+  doc.text(committeeLeadName, 130, y);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text('NIP. 198204152006042003', 130, y + 5);
+  doc.text(`NIP. ${committeeLeadNip}`, 130, y + 5);
 
   // Footer text
   doc.setFontSize(7);
@@ -390,3 +397,88 @@ export const parseXLSXFile = async (file: File): Promise<Record<string, unknown>
     reader.readAsArrayBuffer(file);
   });
 };
+
+// 6. CSV TEMPLATE GENERATORS FOR SUPABASE & APP IMPORT
+export const downloadCsvTemplatePenerima = () => {
+  const headers = ['Nama Pegawai', 'Unit Kerja', 'Jabatan', 'Kategori', 'Poin Dasar', 'Poin Kompetensi', 'Poin Risiko', 'Poin Kinerja', 'Nilai Per Poin (Rp)', 'PPh 21 (%)'];
+  const sampleRow1 = ['dr. Ahmad Subagyo, Sp.B', 'Instalasi Bedah Sentral', 'Dokter Spesialis Bedah', 'Spesialis', 120, 95, 85, 110, 50000, 5];
+  const sampleRow2 = ['Ns. Tri Astuti, S.Kep', 'Instalasi Gawat Darurat (IGD)', 'Perawat Pelaksana', 'Perawat', 80, 75, 80, 90, 36000, 5];
+
+  const csvContent = '\uFEFF' + [
+    headers.map(h => `"${h}"`).join(','),
+    sampleRow1.map(v => typeof v === 'string' ? `"${v}"` : v).join(','),
+    sampleRow2.map(v => typeof v === 'string' ? `"${v}"` : v).join(',')
+  ].join('\r\n');
+
+  downloadBlobAsFile(csvContent, 'TEMPLAT_IMPOR_PENERIMA_JASPEL.csv');
+};
+
+export const downloadCsvTemplateSupabasePenerima = () => {
+  const headers = [
+    'id', 'alokasi_id', 'pegawai_id', 'nama', 'unit_kerja', 'jabatan', 'kategori',
+    'poin_dasar', 'poin_kompetensi', 'poin_risiko', 'poin_kinerja', 'total_poin',
+    'nilai_per_poin', 'bruto_jaspel', 'pajak_pph21_persen', 'potongan_pph21',
+    'netto_diterima', 'status_koreksi', 'catatan_koreksi', 'sudah_dibayar'
+  ];
+  const sampleRow = [
+    'pen-sup-001', 'alo-1', 'u-101', 'dr. Ahmad Subagyo, Sp.B', 'Instalasi Bedah Sentral',
+    'Dokter Spesialis Bedah', 'Spesialis', 120, 95, 85, 110, 410, 50000, 20500000, 5, 1025000,
+    19475000, 'Sesuai', '', false
+  ];
+
+  const csvContent = '\uFEFF' + [
+    headers.join(','),
+    sampleRow.map(v => typeof v === 'string' ? `"${v}"` : v).join(',')
+  ].join('\r\n');
+
+  downloadBlobAsFile(csvContent, 'SUPABASE_TABEL_penerima_alokasi.csv');
+};
+
+export const downloadCsvTemplateIndeksJasa = () => {
+  const headers = [
+    'id', 'kode', 'instalasi_layanan', 'kategori', 'kinerja1', 'kinerja2', 'kinerja3',
+    'total_poin', 'jumlah_alokasi', 'rupiah_per_poin1', 'rupiah_per_poin2', 'nilai_jp_langsung'
+  ];
+  const sampleRow = [
+    'ijl-001', 'IJL-001', 'Instalasi Gawat Darurat (IGD)', 'Pelayanan Medis',
+    100, 80, 85, 265, 150000000, 150000, 120000, 39750000
+  ];
+
+  const csvContent = '\uFEFF' + [
+    headers.join(','),
+    sampleRow.map(v => typeof v === 'string' ? `"${v}"` : v).join(',')
+  ].join('\r\n');
+
+  downloadBlobAsFile(csvContent, 'SUPABASE_TABEL_indeks_jasa_langsung.csv');
+};
+
+export const downloadCsvTemplateGeneralIndex = () => {
+  const headers = [
+    'id', 'kode', 'nama_pegawai', 'nip', 'unit_kerja', 'golongan', 'pendidikan',
+    'masa_kerja_tahun', 'skor_dasar', 'skor_kompetensi', 'skor_risiko', 'skor_kinerja',
+    'bobot_presensi', 'status_pegawai'
+  ];
+  const sampleRow = [
+    'idx-001', 'GI-001', 'dr. Ahmad Subagyo, Sp.B', '198001012005011001',
+    'Instalasi Bedah Sentral', 'IV/a', 'Spesialis', 15, 120, 95, 85, 110, 100, 'PNS'
+  ];
+
+  const csvContent = '\uFEFF' + [
+    headers.join(','),
+    sampleRow.map(v => typeof v === 'string' ? `"${v}"` : v).join(',')
+  ].join('\r\n');
+
+  downloadBlobAsFile(csvContent, 'SUPABASE_TABEL_general_index.csv');
+};
+
+const downloadBlobAsFile = (content: string, filename: string) => {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+

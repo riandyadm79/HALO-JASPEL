@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Printer, Download, Copy, Check, FileText, Sparkles, Building2, User } from 'lucide-react';
 import { PenerimaAlokasi, AlokasiJaspel } from '../types';
+import { HospitalProfile, DEFAULT_HOSPITAL_PROFILE } from './HospitalProfileModal';
 import { formatRupiah, formatNumber, formatDateIndo } from '../utils/calculations';
 import { exportSlipPdf } from '../utils/exportImport';
 
@@ -8,12 +9,14 @@ interface SlipJaspelModalProps {
   penerima: PenerimaAlokasi;
   alokasi: AlokasiJaspel;
   onClose: () => void;
+  hospitalProfile?: HospitalProfile;
 }
 
 export const SlipJaspelModal: React.FC<SlipJaspelModalProps> = ({
   penerima,
   alokasi,
-  onClose
+  onClose,
+  hospitalProfile = DEFAULT_HOSPITAL_PROFILE
 }) => {
   const [copied, setCopied] = React.useState(false);
 
@@ -22,13 +25,13 @@ export const SlipJaspelModal: React.FC<SlipJaspelModalProps> = ({
   };
 
   const handleDownloadPdf = () => {
-    exportSlipPdf(penerima, alokasi, 'RSUD / BLUD SEHAT SENTOSA');
+    exportSlipPdf(penerima, alokasi, hospitalProfile.hospitalName);
   };
 
   const handleCopyText = () => {
     const text = `
 *SLIP JASA PELAYANAN (HALO JASPEL)*
-RSUD / BLUD SEHAT SENTOSA
+${hospitalProfile.hospitalName}
 Periode: ${alokasi.bulan} ${alokasi.tahun}
 ----------------------------------------
 Nama      : ${penerima.nama}
@@ -101,23 +104,23 @@ Status: ${penerima.statusKoreksi}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 rounded-xl bg-[#0c1633] flex items-center justify-center font-black text-amber-400 text-xl shadow border border-blue-900">
-                  HJ
+                  {hospitalProfile.hospitalName.substring(0, 2).toUpperCase()}
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-black tracking-tight text-[#0c1633] uppercase">
-                    RSUD / BLUD SEHAT SENTOSA
+                    {hospitalProfile.hospitalName}
                   </h2>
                   <p className="text-[11px] font-semibold text-slate-600">
-                    Sistem Remunerasi Jasa Pelayanan Terintegrasi (HALO JASPEL)
+                    {hospitalProfile.subtitle || 'Sistem Remunerasi Jasa Pelayanan Terintegrasi (HALO JASPEL)'}
                   </p>
                   <p className="text-[10px] text-slate-500">
-                    Jl. Kesehatan Utama No. 88, Kota Sentosa • Telp (031) 888-9999
+                    {hospitalProfile.address} • {hospitalProfile.city} • Telp: {hospitalProfile.phone}
                   </p>
                 </div>
               </div>
               <div className="text-right hidden sm:block">
                 <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-extrabold text-[10px] border border-amber-300">
-                  DOKUMEN RESMI
+                  {hospitalProfile.badgeText || 'DOKUMEN RESMI'}
                 </span>
                 <p className="text-[10px] text-slate-500 mt-1 font-mono">
                   {alokasi.kodePeriode}
@@ -230,17 +233,17 @@ Status: ${penerima.statusKoreksi}
               <p className="text-[10px] text-slate-500">{penerima.jabatan}</p>
             </div>
             <div>
-              <p className="text-slate-500 text-[11px]">Ketua Tim Perumus Jaspel,</p>
+              <p className="text-slate-500 text-[11px]">{hospitalProfile.committeeLeadTitle || 'Ketua Tim Remunerasi & Jaspel'},</p>
               <div className="h-16 flex items-end justify-center">
-                <p className="font-bold underline text-slate-900">drg. Ratna Kartika, Sp.KGA</p>
+                <p className="font-bold underline text-slate-900">{hospitalProfile.committeeLeadName || 'drg. Ratna Kartika, Sp.KGA'}</p>
               </div>
-              <p className="text-[10px] text-slate-500">NIP. 198204152006042003</p>
+              <p className="text-[10px] text-slate-500">NIP. {hospitalProfile.committeeLeadNip || '198204152006042003'}</p>
             </div>
           </div>
 
           {/* Footer note */}
           <div className="text-[9px] text-slate-400 text-center border-t border-slate-100 pt-2">
-            Dokumen ini dihasilkan secara sah melalui Aplikasi HALO JASPEL — Validasi digital BLUD RSUD SEHAT SENTOSA.
+            Dokumen ini dihasilkan secara sah melalui Aplikasi HALO JASPEL — Validasi digital BLUD {hospitalProfile.hospitalName}.
           </div>
 
         </div>

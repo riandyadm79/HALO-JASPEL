@@ -13,13 +13,18 @@ import {
   FileCheck2
 } from 'lucide-react';
 import { AlokasiJaspel, PenerimaAlokasi, GeneralIndexItem, CostCenterItem, RevenueCenterItem, User } from '../types';
+import { HospitalProfile, DEFAULT_HOSPITAL_PROFILE } from './HospitalProfileModal';
 import { 
   exportToXLSX, 
   exportDatabaseToXLSX, 
   exportToCSV, 
   exportToTextSummary, 
   parseCSVFile, 
-  parseXLSXFile 
+  parseXLSXFile,
+  downloadCsvTemplatePenerima,
+  downloadCsvTemplateSupabasePenerima,
+  downloadCsvTemplateIndeksJasa,
+  downloadCsvTemplateGeneralIndex
 } from '../utils/exportImport';
 import { formatRupiah, formatNumber } from '../utils/calculations';
 
@@ -32,6 +37,7 @@ interface ExportImportCenterProps {
   costCenterList: CostCenterItem[];
   revenueCenterList: RevenueCenterItem[];
   currentUser: User;
+  hospitalProfile?: HospitalProfile;
 }
 
 export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
@@ -42,7 +48,8 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
   setGeneralIndexList,
   costCenterList,
   revenueCenterList,
-  currentUser
+  currentUser,
+  hospitalProfile = DEFAULT_HOSPITAL_PROFILE
 }) => {
   const [selectedAlokasiId, setSelectedAlokasiId] = useState<string>(alokasiList[0]?.id || '');
   const [textPreview, setTextPreview] = useState<string>('');
@@ -58,10 +65,10 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
   // Generate text summary on selection
   React.useEffect(() => {
     if (selectedAlokasi) {
-      const summary = exportToTextSummary(selectedAlokasi, currentPenerima);
+      const summary = exportToTextSummary(selectedAlokasi, currentPenerima, hospitalProfile.hospitalName);
       setTextPreview(summary);
     }
-  }, [selectedAlokasiId, alokasiList, penerimaList]);
+  }, [selectedAlokasiId, alokasiList, penerimaList, hospitalProfile]);
 
   const handleCopyText = () => {
     navigator.clipboard.writeText(textPreview);
@@ -368,7 +375,78 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
               )}
             </div>
 
-            {/* Notification alert */}
+            {/* Download CSV Templates Box */}
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center space-x-1.5">
+                  <Download className="w-4 h-4 text-amber-400" />
+                  <span>Unduh Templat CSV Impor & Supabase</span>
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">Format .CSV UTF-8</span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Gunakan templat resmi ini untuk diisi data baru lalu diimpor ke aplikasi atau diunggah langsung ke tabel Supabase:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={downloadCsvTemplatePenerima}
+                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-bold border border-slate-700 transition flex items-center justify-between"
+                  title="Templat CSV dengan header Bahasa Indonesia untuk Impor Aplikasi"
+                >
+                  <span>1. Templat Impor Penerima</span>
+                  <Download className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadCsvTemplateSupabasePenerima}
+                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-300 font-bold border border-slate-700 transition flex items-center justify-between"
+                  title="Templat CSV dengan struktur kolom Supabase (penerima_alokasi)"
+                >
+                  <span>2. Supabase: penerima_alokasi</span>
+                  <Download className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadCsvTemplateIndeksJasa}
+                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-blue-300 font-bold border border-slate-700 transition flex items-center justify-between"
+                  title="Templat CSV dengan struktur kolom Supabase (indeks_jasa_langsung)"
+                >
+                  <span>3. Supabase: indeks_jasa_langsung</span>
+                  <Download className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadCsvTemplateGeneralIndex}
+                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-indigo-300 font-bold border border-slate-700 transition flex items-center justify-between"
+                  title="Templat CSV dengan struktur kolom Supabase (general_index)"
+                >
+                  <span>4. Supabase: general_index</span>
+                  <Download className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                </button>
+              </div>
+            </div>
+
+            {/* Clear All Recipient Data Button */}
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-rose-300 block">Kosongkan Data Penerima</span>
+                <span className="text-[10px] text-slate-400">Hapus seluruh data nama penerima lama dari Local Storage.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Apakah Anda yakin ingin MENGHAPUS SELURUH DATA PENERIMA yang tersimpan di Local Storage? Data yang terhapus tidak dapat dikembalikan.')) {
+                    setPenerimaList([]);
+                    localStorage.removeItem('halo_japel_penerima_list');
+                    alert('Seluruh data penerima lama telah berhasil dikosongkan!');
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 font-bold text-xs border border-rose-800/80 transition"
+              >
+                Kosongkan Data Penerima
+              </button>
+            </div>
             {importSuccessMessage && (
               <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs font-bold flex items-center space-x-2">
                 <Check className="w-4 h-4 text-emerald-400 shrink-0" />
