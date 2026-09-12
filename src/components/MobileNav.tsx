@@ -11,7 +11,8 @@ import {
   Filter,
   Sun,
   Moon,
-  TrendingUp
+  TrendingUp,
+  Stethoscope
 } from 'lucide-react';
 import { RoleType, User } from '../types';
 import { INSTALASI_LAYANAN_LIST } from '../data/initialData';
@@ -43,6 +44,12 @@ export const MobileNav: React.FC<MobileNavProps> = ({
 
   const menuItems = [
     {
+      id: 'indeks_jasa',
+      label: 'Indeks Jasa',
+      icon: Stethoscope,
+      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[]
+    },
+    {
       id: 'rekap_cetak',
       label: 'Rekap & Cetak',
       icon: FileSpreadsheet,
@@ -52,19 +59,19 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       id: 'alokasi',
       label: 'Alokasi Jaspel',
       icon: Calculator,
-      roles: ['superadmin'] as RoleType[]
+      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[]
     },
     {
       id: 'visualisasi',
       label: 'Visualisasi',
       icon: TrendingUp,
-      roles: ['superadmin'] as RoleType[]
+      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[]
     },
     {
       id: 'database',
       label: 'DB Manajer',
       icon: Database,
-      roles: ['superadmin'] as RoleType[]
+      roles: ['superadmin', 'perumus', 'pic'] as RoleType[]
     },
     {
       id: 'rbac',
@@ -250,7 +257,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                       <button
                         key={name}
                         onClick={() => {
-                          setActiveTab('alokasi');
+                          setActiveTab('indeks_jasa');
                           setSelectedCategory(name);
                           onClose();
                         }}

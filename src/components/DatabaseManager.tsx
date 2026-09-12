@@ -24,7 +24,8 @@ import {
   Check,
   Sparkles,
   Code,
-  Info
+  Info,
+  Printer
 } from 'lucide-react';
 import { 
   GeneralIndexItem, 
@@ -38,8 +39,9 @@ import { formatRupiah, formatNumber, formatPercentage, evaluateJpFormula } from 
 import { supabase } from "../lib/supabase";
 import { exportToCSV } from '../utils/exportImport';
 import { INSTALASI_LAYANAN_LIST, DEFAULT_INDEKS_JASA_HEADER_CONFIG, INITIAL_INDEKS_JASA_LANGSUNG } from '../data/initialData';
-import { OFFICIAL_GENERAL_INDEX_DATA } from '../data/generalIndexData';
 import { CurrencyInput } from './CurrencyInput';
+import { ConfirmModal } from './ConfirmModal';
+import { IndeksJasaLangsungManager } from './IndeksJasaLangsungManager';
 
 interface DatabaseManagerProps {
   generalIndexList: GeneralIndexItem[];
@@ -88,6 +90,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
   const updateHeaderConfig = setIndeksJasaHeaderConfig || setInternalHeaderConfig;
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [indeksJasaViewMode, setIndeksJasaViewMode] = useState<'rekap_kinerja_csv' | 'matriks_formula'>('rekap_kinerja_csv');
 
   // Modals state
   const [showIndexModal, setShowIndexModal] = useState(false);
@@ -163,7 +166,23 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
     nilaiJpLangsung: 0
   });
 
-  const canEdit = ['superadmin', 'perumus', 'input_medis', 'input_perawat', 'input_nakes_lain', 'input_psikiatri', 'input_spesialis'].includes(currentUser?.role || 'staf');
+  const canEdit = ['superadmin', 'perumus', 'pic', 'input_medis', 'input_perawat', 'input_nakes_lain', 'input_psikiatri', 'input_spesialis'].includes(currentUser?.role || 'staf');
+
+  // Modal konfirmasi custom yang aman untuk lingkungan iframe
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
 
   // Filtered lists
   const filteredGeneral = generalIndexList.filter(item => 
@@ -246,11 +265,23 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
     }
   };
 
-  const handleDeleteIndex = async (id: string) => {
-    if (confirm('Hapus pegawai dari master General Index?')) {
-      await supabase.from('general_index').delete().eq('id', id);
-      setGeneralIndexList(generalIndexList.filter(i => i.id !== id));
-    }
+  const handleDeleteIndex = (id: string, namaPegawai?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Pegawai dari Master Index',
+      message: `Apakah Anda yakin ingin menghapus data pegawai ${namaPegawai ? `"${namaPegawai}"` : ''} dari master General Index? Tindakan ini akan menghapus data dari daftar dan database.`,
+      confirmText: 'Ya, Hapus Pegawai',
+      cancelText: 'Batal',
+      isDanger: true,
+      onConfirm: async () => {
+        setGeneralIndexList(prev => prev.filter(i => i.id !== id));
+        try {
+          await supabase.from('general_index').delete().eq('id', id);
+        } catch (err) {
+          console.error('Error deleting general index item:', err);
+        }
+      }
+    });
   };
 
   // Handlers for Cost Center
@@ -284,11 +315,23 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
     }
   };
 
-  const handleDeleteCost = async (id: string) => {
-    if (confirm('Hapus Cost Center ini?')) {
-      await supabase.from('cost_center').delete().eq('id', id);
-      setCostCenterList(costCenterList.filter(c => c.id !== id));
-    }
+  const handleDeleteCost = (id: string, namaPusatBiaya?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Cost Center (Pusat Biaya RS)',
+      message: `Apakah Anda yakin ingin menghapus pusat biaya ${namaPusatBiaya ? `"${namaPusatBiaya}"` : ''}? Data biaya operasional ini akan dihapus dari sistem.`,
+      confirmText: 'Ya, Hapus Sekarang',
+      cancelText: 'Batal',
+      isDanger: true,
+      onConfirm: async () => {
+        setCostCenterList(prev => prev.filter(c => c.id !== id));
+        try {
+          await supabase.from('cost_center').delete().eq('id', id);
+        } catch (err) {
+          console.error('Error deleting cost center:', err);
+        }
+      }
+    });
   };
 
   // Handlers for Revenue Center
@@ -305,7 +348,10 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
       kategori_layanan: newRevenueForm.kategoriLayanan,
       target_pendapatan_bulanan: newRevenueForm.targetPendapatanBulanan,
       realisasi_pendapatan: newRevenueForm.realisasiPendapatan,
-      persentase_pencapaian: newRevenueForm.persentasePencapaian
+      persentase_pencapaian: newRevenueForm.persentasePencapaian,
+      proporsi_retensi_jaspel: newRevenueForm.proporsiRetensiJaspel,
+      kepala_unit: newRevenueForm.kepalaUnit,
+      jumlah_pasien_bulan_ini: newRevenueForm.jumlahPasienBulanIni
     };
 
     try {
@@ -323,11 +369,23 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
     }
   };
 
-  const handleDeleteRevenue = async (id: string) => {
-    if (confirm('Hapus Revenue Center ini?')) {
-      await supabase.from('revenue_center').delete().eq('id', id);
-      setRevenueCenterList(revenueCenterList.filter(r => r.id !== id));
-    }
+  const handleDeleteRevenue = (id: string, namaLayanan?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Revenue Center (Pusat Pendapatan)',
+      message: `Apakah Anda yakin ingin menghapus Revenue Center ${namaLayanan ? `"${namaLayanan}"` : ''}?`,
+      confirmText: 'Ya, Hapus Sekarang',
+      cancelText: 'Batal',
+      isDanger: true,
+      onConfirm: async () => {
+        setRevenueCenterList(prev => prev.filter(r => r.id !== id));
+        try {
+          await supabase.from('revenue_center').delete().eq('id', id);
+        } catch (err) {
+          console.error('Error deleting revenue center:', err);
+        }
+      }
+    });
   };
 
   // Handlers for Indeks Jasa Langsung
@@ -337,52 +395,48 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
     const newForm = { ...indeksJasaForm, nilaiJpLangsung: computedJp };
 
     const id = editingIndeksJasa ? editingIndeksJasa.id : `ijl-${Date.now()}`;
-    const payload = {
-      id,
-      kode: newForm.kode,
-      instalasi_layanan: newForm.instalasiLayanan,
-      kategori: newForm.kategori,
-      kinerja1: newForm.kinerja1,
-      kinerja2: newForm.kinerja2,
-      kinerja3: newForm.kinerja3,
-      total_poin: newForm.totalPoin,
-      jumlah_alokasi: newForm.jumlahAlokasi,
-      rupiah_per_poin1: newForm.rupiahPerPoin1,
-      rupiah_per_poin2: newForm.rupiahPerPoin2,
-      nilai_jp_langsung: newForm.nilaiJpLangsung
-    };
+    const updatedList = editingIndeksJasa 
+      ? currentIndeksJasaList.map(i => i.id === id ? { ...newForm, id } : i)
+      : [...currentIndeksJasaList, { ...newForm, id }];
 
+    updateIndeksJasaList(updatedList);
     try {
-      if (editingIndeksJasa) {
-        await supabase.from('indeks_jasa_langsung').update(payload).eq('id', id);
-        updateIndeksJasaList(currentIndeksJasaList.map(i => i.id === id ? { ...newForm, id } : i));
-      } else {
-        await supabase.from('indeks_jasa_langsung').insert([payload]);
-        updateIndeksJasaList([...currentIndeksJasaList, { ...newForm, id }]);
-      }
+      localStorage.setItem('halo_jaspel_indeks_jasa', JSON.stringify(updatedList));
     } catch (err) {
-      console.error(err);
-      if (editingIndeksJasa) {
-        updateIndeksJasaList(currentIndeksJasaList.map(i => i.id === id ? { ...newForm, id } : i));
-      } else {
-        updateIndeksJasaList([...currentIndeksJasaList, { ...newForm, id }]);
-      }
+      console.warn('Local storage save error:', err);
     }
+
     setShowIndeksJasaModal(false);
   };
 
-  const handleDeleteIndeksJasa = async (id: string) => {
-    if (confirm('Hapus item Indeks Jasa Langsung ini?')) {
-      try {
-        await supabase.from('indeks_jasa_langsung').delete().eq('id', id);
-      } catch (err) {}
-      updateIndeksJasaList(currentIndeksJasaList.filter(i => i.id !== id));
-    }
+  const handleDeleteIndeksJasa = (id: string, namaPegawai?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Item Indeks Jasa Langsung',
+      message: `Apakah Anda yakin ingin menghapus baris indeks jasa ${namaPegawai ? `"${namaPegawai}"` : ''}?`,
+      confirmText: 'Ya, Hapus Item',
+      cancelText: 'Batal',
+      isDanger: true,
+      onConfirm: () => {
+        const filtered = currentIndeksJasaList.filter(i => i.id !== id);
+        updateIndeksJasaList(filtered);
+        try {
+          localStorage.setItem('halo_jaspel_indeks_jasa', JSON.stringify(filtered));
+        } catch (err) {
+          console.warn('Local storage save error:', err);
+        }
+      }
+    });
   };
 
   const handleSaveHeaderAndFormula = (e: React.FormEvent) => {
     e.preventDefault();
     updateHeaderConfig(tempHeaderConfig);
+    try {
+      localStorage.setItem('halo_jaspel_indeks_jasa_header_config', JSON.stringify(tempHeaderConfig));
+    } catch (err) {
+      console.warn('Local storage save error:', err);
+    }
     setShowFormulaHeaderModal(false);
   };
 
@@ -592,9 +646,17 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
             {activeSubTab === 'general' && canEdit && (
               <button
                 onClick={() => {
-                  if (confirm('Gantikan General Index dengan dataset resmi RSUD lengkap?')) {
-                    setGeneralIndexList(OFFICIAL_GENERAL_INDEX_DATA);
-                  }
+                  setConfirmModal({
+                    isOpen: true,
+                    title: 'Reset Master Data RSUD',
+                    message: 'Apakah Anda yakin ingin mereset dan mengosongkan General Index untuk memuat ulang dataset resmi RSUD lengkap?',
+                    confirmText: 'Ya, Reset Data',
+                    cancelText: 'Batal',
+                    isDanger: false,
+                    onConfirm: () => {
+                      setGeneralIndexList([]);
+                    }
+                  });
                 }}
                 className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-blue-900/80 hover:bg-blue-800 text-blue-200 border border-blue-700 font-bold text-xs transition active:scale-95 shrink-0"
                 title="Muat ulang tabel General Indeks resmi RSUD"
@@ -649,47 +711,67 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
             <table className="w-full text-left border-collapse text-xs">
               <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
                 <tr>
-                  <th className="py-3.5 px-4">Nama & NIP</th>
-                  <th className="py-3.5 px-3">Unit Kerja</th>
-                  <th className="py-3.5 px-3">Golongan & Masa</th>
-                  <th className="py-3.5 px-3 text-center">Dasar</th>
-                  <th className="py-3.5 px-3 text-center">Kompetensi</th>
-                  <th className="py-3.5 px-3 text-center">Risiko</th>
-                  <th className="py-3.5 px-3 text-center">Kinerja</th>
-                  <th className="py-3.5 px-3 text-center font-bold text-amber-400">Total Skor</th>
-                  <th className="py-3.5 px-3 text-center">Presensi</th>
-                  <th className="py-3.5 px-3 text-center">Status</th>
+                  <th className="py-3.5 px-4">Nama & Jabatan</th>
+                  <th className="py-3.5 px-3">Ruangan / Unit</th>
+                  <th className="py-3.5 px-3">Kelompok Jasa</th>
+                  <th className="py-3.5 px-3 text-center">Skor Total</th>
+                  <th className="py-3.5 px-3 text-right">Rp Total (MK+PD+Jab+dll)</th>
+                  <th className="py-3.5 px-3 text-right">Post Remunerasi</th>
+                  <th className="py-3.5 px-3 text-right text-amber-400 font-bold">Jaspel Total</th>
+                  <th className="py-3.5 px-3 text-center">Administrasi %</th>
                   {canEdit && <th className="py-3.5 px-3 text-center">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-200">
-                {filteredGeneral.map((item) => {
-                  const total = item.skorDasar + item.skorKompetensi + item.skorRisiko + item.skorKinerja;
+                {filteredGeneral.length === 0 ? (
+                  <tr>
+                    <td colSpan={canEdit ? 11 : 10} className="py-16 text-center text-slate-400">
+                      <div className="max-w-md mx-auto space-y-2">
+                        <p className="font-semibold text-slate-300 text-sm">
+                          {generalIndexList.length === 0
+                            ? 'Belum ada data General Index Pegawai di Supabase'
+                            : 'Tidak ada data pegawai yang cocok dengan kata kunci pencarian'}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {generalIndexList.length === 0
+                            ? 'Tabel murni kosong sesuai data asli. Silakan tambahkan pegawai baru dengan tombol "+ Tambah Pegawai" atau impor data berkas resmi.'
+                            : 'Coba periksa kembali ejaan nama atau NIP yang dicari.'}
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredGeneral.map((item) => {
+                  const rpTotalKinerja = (item.rpMk || 0) + (item.rpPd || 0) + (item.rpJab || 0) + (item.rpRis || 0) + (item.rpEmg || 0);
                   return (
                     <tr key={item.id} className="hover:bg-slate-800/40 transition">
                       <td className="py-3 px-4">
                         <div className="font-bold text-white text-xs sm:text-sm">{item.namaPegawai}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">NIP. {item.nip}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{item.jabatan || item.jabatanUnit || '-'}</div>
                       </td>
-                      <td className="py-3 px-3 text-slate-300">{item.unitKerja}</td>
                       <td className="py-3 px-3 text-slate-300">
-                        <div>{item.golongan}</div>
-                        <div className="text-[10px] text-slate-400">{item.masaKerjaTahun} Tahun • {item.pendidikan}</div>
+                        <div className="font-semibold text-xs">{item.ruangan || item.unitKerja || '-'}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{item.kelompokPelayanan || '-'}</div>
                       </td>
-                      <td className="py-3 px-3 text-center font-mono">{item.skorDasar}</td>
-                      <td className="py-3 px-3 text-center font-mono">{item.skorKompetensi}</td>
-                      <td className="py-3 px-3 text-center font-mono">{item.skorRisiko}</td>
-                      <td className="py-3 px-3 text-center font-mono">{item.skorKinerja}</td>
-                      <td className="py-3 px-3 text-center font-mono font-black text-amber-400 text-xs sm:text-sm">
-                        {total}
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="font-mono text-emerald-400 font-semibold">{item.bobotPresensi}%</span>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 border border-slate-700 text-slate-300">
-                          {item.statusPegawai}
+                      <td className="py-3 px-3 text-slate-300">
+                        <span className="inline-block px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs text-blue-300 font-medium">
+                          {item.kelompokJasa || '-'}
                         </span>
+                      </td>
+                      <td className="py-3 px-3 text-center font-mono">
+                        {Number(item.skorTotal || 0).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono">
+                        {formatRupiah(rpTotalKinerja)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono">
+                        {formatRupiah(item.jaspelPostRemunerasi || 0)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono font-black text-amber-400">
+                        {formatRupiah(item.jaspelPostTotal || 0)}
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className="font-mono text-emerald-400 font-semibold">{item.persenAdministrasi || '0%'}</span>
                       </td>
                       {canEdit && (
                         <td className="py-3 px-3 text-center whitespace-nowrap">
@@ -705,8 +787,9 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleDeleteIndex(item.id)}
+                              onClick={() => handleDeleteIndex(item.id, item.namaPegawai)}
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
+                              title="Hapus data pegawai"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -715,7 +798,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
                       )}
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>
@@ -737,53 +820,73 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-200">
-                {filteredCost.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-800/40 transition">
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-white text-xs sm:text-sm">{item.namaPusatBiaya}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{item.kodeCostCenter}</div>
+                {filteredCost.length === 0 ? (
+                  <tr>
+                    <td colSpan={canEdit ? 7 : 6} className="py-12 text-center text-slate-400">
+                      <div className="max-w-md mx-auto space-y-2">
+                        <p className="font-semibold text-slate-300 text-sm">
+                          {costCenterList.length === 0
+                            ? 'Belum ada data Cost Center tersimpan di database'
+                            : 'Tidak ada Cost Center yang sesuai dengan pencarian'}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {costCenterList.length === 0
+                            ? 'Klik tombol "+ Tambah Cost Center" di atas untuk menambahkan pos beban RS.'
+                            : 'Coba ubah kata kunci pencarian.'}
+                        </p>
+                      </div>
                     </td>
-                    <td className="py-3 px-3 text-slate-300">{item.kategori}</td>
-                    <td className="py-3 px-4 text-right font-mono text-slate-400">
-                      {formatRupiah(item.alokasiAnggaranBulanan)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-rose-400">
-                      {formatRupiah(item.realisasiBiaya)}
-                    </td>
-                    <td className="py-3 px-3 text-slate-300">{item.penanggungJawab}</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        item.status === 'Aktif' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
-                        item.status === 'Monitoring' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
-                        'bg-rose-950 text-rose-300 border border-rose-800'
-                      }`}>
-                        {item.status}
-                      </span>
-                    </td>
-                    {canEdit && (
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center space-x-1">
-                          <button
-                            onClick={() => {
-                              setEditingCost(item);
-                              setCostForm(item);
-                              setShowCostModal(true);
-                            }}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCost(item.id)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
                   </tr>
-                ))}
+                ) : (
+                  filteredCost.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-800/40 transition">
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-white text-xs sm:text-sm">{item.namaPusatBiaya}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{item.kodeCostCenter}</div>
+                      </td>
+                      <td className="py-3 px-3 text-slate-300">{item.kategori}</td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-400">
+                        {formatRupiah(item.alokasiAnggaranBulanan)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-rose-400">
+                        {formatRupiah(item.realisasiBiaya)}
+                      </td>
+                      <td className="py-3 px-3 text-slate-300">{item.penanggungJawab}</td>
+                      <td className="py-3 px-3 text-center">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          item.status === 'Aktif' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                          item.status === 'Monitoring' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                          'bg-rose-950 text-rose-300 border border-rose-800'
+                        }`}>
+                          {item.status}
+                        </span>
+                      </td>
+                      {canEdit && (
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              onClick={() => {
+                                setEditingCost(item);
+                                setCostForm(item);
+                                setShowCostModal(true);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCost(item.id, item.namaPusatBiaya)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
+                              title="Hapus Cost Center"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -806,54 +909,74 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-200">
-                {filteredRevenue.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-800/40 transition">
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-white text-xs sm:text-sm">{item.namaPusatLayanan}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{item.kodeRevenueCenter} • {item.kategoriLayanan}</div>
+                {filteredRevenue.length === 0 ? (
+                  <tr>
+                    <td colSpan={canEdit ? 8 : 7} className="py-12 text-center text-slate-400">
+                      <div className="max-w-md mx-auto space-y-2">
+                        <p className="font-semibold text-slate-300 text-sm">
+                          {revenueCenterList.length === 0
+                            ? 'Belum ada data Revenue Center tersimpan di database'
+                            : 'Tidak ada Revenue Center yang sesuai dengan pencarian'}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {revenueCenterList.length === 0
+                            ? 'Klik tombol "+ Tambah Revenue Center" di atas untuk menambahkan unit penghasil pendapatan.'
+                            : 'Coba ubah kata kunci pencarian.'}
+                        </p>
+                      </div>
                     </td>
-                    <td className="py-3 px-4 text-right font-mono text-slate-400">
-                      {formatRupiah(item.targetPendapatanBulanan)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
-                      {formatRupiah(item.realisasiPendapatan)}
-                    </td>
-                    <td className="py-3 px-3 text-center font-mono font-bold">
-                      <span className={item.persentasePencapaian >= 100 ? 'text-emerald-400' : 'text-amber-400'}>
-                        {item.persentasePencapaian}%
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center font-mono text-amber-400 font-bold">
-                      {item.proporsiRetensiJaspel}%
-                    </td>
-                    <td className="py-3 px-3 text-slate-300">{item.kepalaUnit}</td>
-                    <td className="py-3 px-3 text-center font-mono text-slate-300">
-                      {formatNumber(item.jumlahPasienBulanIni)}
-                    </td>
-                    {canEdit && (
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center space-x-1">
-                          <button
-                            onClick={() => {
-                              setEditingRevenue(item);
-                              setRevenueForm(item);
-                              setShowRevenueModal(true);
-                            }}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRevenue(item.id)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
                   </tr>
-                ))}
+                ) : (
+                  filteredRevenue.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-800/40 transition">
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-white text-xs sm:text-sm">{item.namaPusatLayanan}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{item.kodeRevenueCenter} • {item.kategoriLayanan}</div>
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-400">
+                        {formatRupiah(item.targetPendapatanBulanan)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
+                        {formatRupiah(item.realisasiPendapatan)}
+                      </td>
+                      <td className="py-3 px-3 text-center font-mono font-bold">
+                        <span className={item.persentasePencapaian >= 100 ? 'text-emerald-400' : 'text-amber-400'}>
+                          {item.persentasePencapaian}%
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center font-mono text-amber-400 font-bold">
+                        {item.proporsiRetensiJaspel}%
+                      </td>
+                      <td className="py-3 px-3 text-slate-300">{item.kepalaUnit}</td>
+                      <td className="py-3 px-3 text-center font-mono text-slate-300">
+                        {formatNumber(item.jumlahPasienBulanIni)}
+                      </td>
+                      {canEdit && (
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              onClick={() => {
+                                setEditingRevenue(item);
+                                setRevenueForm(item);
+                                setShowRevenueModal(true);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRevenue(item.id, item.namaPusatLayanan)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
+                              title="Hapus Revenue Center"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -862,119 +985,158 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
         {/* TAB 4: INDEKS JASA LANGSUNG TABLE */}
         {activeSubTab === 'indeks_jasa' && (
           <div className="space-y-4">
-            {/* Active Formula Banner */}
-            <div className="bg-[#0b162c] border border-amber-500/30 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs shadow-inner">
-              <div className="flex items-start space-x-3">
-                <div className="p-2 rounded-xl bg-amber-400/20 text-amber-300 shrink-0 mt-0.5">
-                  <Calculator className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-extrabold text-white text-xs uppercase tracking-wider">Formula Aritmatika Nilai JP Langsung (Customized)</span>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">LIVE FORMULA</span>
-                  </div>
-                  <p className="font-mono text-amber-300 text-xs font-bold mt-1 bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 inline-block">
-                    {currentHeaderConfig.headerNilaiJpLangsung} = {currentHeaderConfig.formulaJpLangsung}
-                  </p>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Header & formula dapat dikustomisasi secara interaktif. Nilai JP dihitung otomatis secara langsung per instalasi/layanan.
-                  </p>
-                </div>
+            {/* View Mode Switcher */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800 gap-2 shadow-md">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setIndeksJasaViewMode('rekap_kinerja_csv')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-black transition flex items-center space-x-2 ${
+                    indeksJasaViewMode === 'rekap_kinerja_csv'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>1. Input Kinerja Pelayanan (CSV 10 Unit & 65 Staf)</span>
+                </button>
+
+                <button
+                  onClick={() => setIndeksJasaViewMode('matriks_formula')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-black transition flex items-center space-x-2 ${
+                    indeksJasaViewMode === 'matriks_formula'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <Calculator className="w-4 h-4" />
+                  <span>2. Matriks Indeks Jasa & Formula Kustom</span>
+                </button>
               </div>
 
-              {canEdit && (
-                <button
-                  onClick={() => {
-                    setTempHeaderConfig(currentHeaderConfig);
-                    setShowFormulaHeaderModal(true);
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-lg transition flex items-center space-x-1.5 shrink-0 self-start md:self-center"
-                >
-                  <Sliders className="w-4 h-4" />
-                  <span>Ubah Formula / Header</span>
-                </button>
-              )}
+              <span className="text-[11px] text-slate-400 font-mono hidden md:inline-block pr-2">
+                {indeksJasaViewMode === 'rekap_kinerja_csv' ? 'Mode: Rekapitulasi CSV Pelayanan' : 'Mode: Formula Dinamis'}
+              </span>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-slate-800">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
-                  <tr>
-                    <th className="py-3.5 px-4 whitespace-nowrap">Instalasi & Layanan</th>
-                    <th className="py-3.5 px-3 text-center whitespace-nowrap">{currentHeaderConfig.headerKinerja1}</th>
-                    <th className="py-3.5 px-3 text-center whitespace-nowrap">{currentHeaderConfig.headerKinerja2}</th>
-                    <th className="py-3.5 px-3 text-center whitespace-nowrap">{currentHeaderConfig.headerKinerja3}</th>
-                    <th className="py-3.5 px-3 text-center font-bold text-blue-300 whitespace-nowrap">{currentHeaderConfig.headerTotalPoin}</th>
-                    <th className="py-3.5 px-4 text-right whitespace-nowrap">{currentHeaderConfig.headerJumlahAlokasi}</th>
-                    <th className="py-3.5 px-3 text-right whitespace-nowrap">{currentHeaderConfig.headerRupiahPerPoin1}</th>
-                    <th className="py-3.5 px-3 text-right whitespace-nowrap">{currentHeaderConfig.headerRupiahPerPoin2}</th>
-                    <th className="py-3.5 px-4 text-right font-black text-amber-300 bg-amber-950/30 whitespace-nowrap border-l border-amber-900/50">
-                      {currentHeaderConfig.headerNilaiJpLangsung}
-                    </th>
-                    {canEdit && <th className="py-3.5 px-3 text-center whitespace-nowrap">Aksi</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-200">
-                  {filteredIndeksJasa.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="py-8 text-center text-slate-400">
-                        Tidak ada data Indeks Jasa Langsung yang sesuai kriteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredIndeksJasa.map((item) => {
-                      const calculatedJp = evaluateJpFormula(item, currentHeaderConfig.formulaJpLangsung);
-                      return (
-                        <tr key={item.id} className="hover:bg-slate-800/40 transition">
-                          <td className="py-3 px-4">
-                            <div className="font-bold text-white text-xs sm:text-sm">{item.instalasiLayanan}</div>
-                            <div className="text-[10px] text-slate-400 font-mono flex items-center space-x-2">
-                              <span>{item.kode}</span>
-                              <span>•</span>
-                              <span className="px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 border border-slate-700">{item.kategori}</span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 text-center font-mono text-slate-300">{formatNumber(item.kinerja1)}</td>
-                          <td className="py-3 px-3 text-center font-mono text-slate-300">{formatNumber(item.kinerja2)}</td>
-                          <td className="py-3 px-3 text-center font-mono text-slate-300">{formatNumber(item.kinerja3)}</td>
-                          <td className="py-3 px-3 text-center font-mono font-bold text-blue-300 bg-blue-950/20">{formatNumber(item.totalPoin)}</td>
-                          <td className="py-3 px-4 text-right font-mono text-slate-300">{formatRupiah(item.jumlahAlokasi)}</td>
-                          <td className="py-3 px-3 text-right font-mono text-slate-400">{formatRupiah(item.rupiahPerPoin1)}</td>
-                          <td className="py-3 px-3 text-right font-mono text-slate-400">{formatRupiah(item.rupiahPerPoin2)}</td>
-                          <td className="py-3 px-4 text-right font-mono font-black text-amber-300 bg-amber-950/30 text-sm border-l border-amber-900/50">
-                            {formatRupiah(calculatedJp)}
-                          </td>
-                          {canEdit && (
-                            <td className="py-3 px-3 text-center whitespace-nowrap">
-                              <div className="flex items-center justify-center space-x-1">
-                                <button
-                                  onClick={() => {
-                                    setEditingIndeksJasa(item);
-                                    setIndeksJasaForm(item);
-                                    setShowIndeksJasaModal(true);
-                                  }}
-                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
-                                  title="Ubah Data Indeks Jasa"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteIndeksJasa(item.id)}
-                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
-                                  title="Hapus Data Indeks Jasa"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })
+            {indeksJasaViewMode === 'rekap_kinerja_csv' ? (
+              <IndeksJasaLangsungManager currentUser={currentUser} />
+            ) : (
+              <div className="space-y-4">
+                {/* Active Formula Banner */}
+                <div className="bg-[#0b162c] border border-amber-500/30 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs shadow-inner">
+                  <div className="flex items-start space-x-3">
+                    <div className="p-2 rounded-xl bg-amber-400/20 text-amber-300 shrink-0 mt-0.5">
+                      <Calculator className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-extrabold text-white text-xs uppercase tracking-wider">Formula Aritmatika Nilai JP Langsung (Customized)</span>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">LIVE FORMULA</span>
+                      </div>
+                      <p className="font-mono text-amber-300 text-xs font-bold mt-1 bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 inline-block">
+                        {currentHeaderConfig.headerNilaiJpLangsung} = {currentHeaderConfig.formulaJpLangsung}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Header & formula dapat dikustomisasi secara interaktif. Nilai JP dihitung otomatis secara langsung per instalasi/layanan.
+                      </p>
+                    </div>
+                  </div>
+
+                  {canEdit && (
+                    <button
+                      onClick={() => {
+                        setTempHeaderConfig(currentHeaderConfig);
+                        setShowFormulaHeaderModal(true);
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-lg transition flex items-center space-x-1.5 shrink-0 self-start md:self-center"
+                    >
+                      <Sliders className="w-4 h-4" />
+                      <span>Ubah Formula / Header</span>
+                    </button>
                   )}
-                </tbody>
-              </table>
-            </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
+                      <tr>
+                        <th className="py-3.5 px-4 whitespace-nowrap">Instalasi & Layanan</th>
+                        <th className="py-3.5 px-3 text-center whitespace-nowrap">{currentHeaderConfig.headerKinerja1}</th>
+                        <th className="py-3.5 px-3 text-center whitespace-nowrap">{currentHeaderConfig.headerKinerja2}</th>
+                        <th className="py-3.5 px-3 text-center whitespace-nowrap">{currentHeaderConfig.headerKinerja3}</th>
+                        <th className="py-3.5 px-3 text-center font-bold text-blue-300 whitespace-nowrap">{currentHeaderConfig.headerTotalPoin}</th>
+                        <th className="py-3.5 px-4 text-right whitespace-nowrap">{currentHeaderConfig.headerJumlahAlokasi}</th>
+                        <th className="py-3.5 px-3 text-right whitespace-nowrap">{currentHeaderConfig.headerRupiahPerPoin1}</th>
+                        <th className="py-3.5 px-3 text-right whitespace-nowrap">{currentHeaderConfig.headerRupiahPerPoin2}</th>
+                        <th className="py-3.5 px-4 text-right font-black text-amber-300 bg-amber-950/30 whitespace-nowrap border-l border-amber-900/50">
+                          {currentHeaderConfig.headerNilaiJpLangsung}
+                        </th>
+                        {canEdit && <th className="py-3.5 px-3 text-center whitespace-nowrap">Aksi</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                      {filteredIndeksJasa.length === 0 ? (
+                        <tr>
+                          <td colSpan={10} className="py-8 text-center text-slate-400">
+                            Tidak ada data Indeks Jasa Langsung yang sesuai kriteria.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredIndeksJasa.map((item) => {
+                          const calculatedJp = evaluateJpFormula(item, currentHeaderConfig.formulaJpLangsung);
+                          return (
+                            <tr key={item.id} className="hover:bg-slate-800/40 transition">
+                              <td className="py-3 px-4">
+                                <div className="font-bold text-white text-xs sm:text-sm">{item.instalasiLayanan}</div>
+                                <div className="text-[10px] text-slate-400 font-mono flex items-center space-x-2">
+                                  <span>{item.kode}</span>
+                                  <span>•</span>
+                                  <span className="px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 border border-slate-700">{item.kategori}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-center font-mono text-slate-300">{formatNumber(item.kinerja1)}</td>
+                              <td className="py-3 px-3 text-center font-mono text-slate-300">{formatNumber(item.kinerja2)}</td>
+                              <td className="py-3 px-3 text-center font-mono text-slate-300">{formatNumber(item.kinerja3)}</td>
+                              <td className="py-3 px-3 text-center font-mono font-bold text-blue-300 bg-blue-950/20">{formatNumber(item.totalPoin)}</td>
+                              <td className="py-3 px-4 text-right font-mono text-slate-300">{formatRupiah(item.jumlahAlokasi)}</td>
+                              <td className="py-3 px-3 text-right font-mono text-slate-400">{formatRupiah(item.rupiahPerPoin1)}</td>
+                              <td className="py-3 px-3 text-right font-mono text-slate-400">{formatRupiah(item.rupiahPerPoin2)}</td>
+                              <td className="py-3 px-4 text-right font-mono font-black text-amber-300 bg-amber-950/30 text-sm border-l border-amber-900/50">
+                                {formatRupiah(calculatedJp)}
+                              </td>
+                              {canEdit && (
+                                <td className="py-3 px-3 text-center whitespace-nowrap">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <button
+                                      onClick={() => {
+                                        setEditingIndeksJasa(item);
+                                        setIndeksJasaForm(item);
+                                        setShowIndeksJasaModal(true);
+                                      }}
+                                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                                      title="Ubah Data Indeks Jasa"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteIndeksJasa(item.id, item.namaPegawai)}
+                                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
+                                      title="Hapus Data Indeks Jasa"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1143,13 +1305,11 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <CurrencyInput
-                  label="Anggaran Bulanan (Rp)"
                   value={costForm.alokasiAnggaranBulanan}
                   onChange={val => setCostForm({ ...costForm, alokasiAnggaranBulanan: val })}
                   placeholder="25000000"
                 />
                 <CurrencyInput
-                  label="Realisasi Biaya (Rp)"
                   value={costForm.realisasiBiaya}
                   onChange={val => setCostForm({ ...costForm, realisasiBiaya: val })}
                   placeholder="21000000"
@@ -1215,13 +1375,11 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <CurrencyInput
-                  label="Target Pendapatan (Rp)"
                   value={revenueForm.targetPendapatanBulanan}
                   onChange={val => setRevenueForm({ ...revenueForm, targetPendapatanBulanan: val })}
                   placeholder="650000000"
                 />
                 <CurrencyInput
-                  label="Realisasi Pendapatan (Rp)"
                   value={revenueForm.realisasiPendapatan}
                   onChange={val => setRevenueForm({ ...revenueForm, realisasiPendapatan: val })}
                   placeholder="720000000"
@@ -1635,7 +1793,6 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
                       jumlahAlokasi: 250000000,
                       rupiahPerPoin1: 150000,
                       rupiahPerPoin2: 120000,
-                      nilaiJpLangsung: 0
                     }, tempHeaderConfig.formulaJpLangsung))}
                   </div>
                 </div>
@@ -1658,6 +1815,18 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL KONFIRMASI PENGHAPUSAN (Aman untuk iframe & mobile) */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        isDanger={confirmModal.isDanger !== false}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
 
     </div>
   );

@@ -19,6 +19,7 @@ import {
 import { User, Permission, RoleType } from '../types';
 import { supabase } from '../lib/supabase';
 import { INSTALASI_LAYANAN_LIST } from '../data/initialData';
+import { ConfirmModal } from './ConfirmModal';
 
 interface RbacMatrixManagerProps {
   users: User[];
@@ -26,7 +27,6 @@ interface RbacMatrixManagerProps {
   permissions: Permission[];
   setPermissions: React.Dispatch<React.SetStateAction<Permission[]>>;
   currentUser: User;
-  onSelectUser: (user: User) => void;
 }
 
 export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
@@ -34,8 +34,7 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
   setUsers,
   permissions,
   setPermissions,
-  currentUser,
-  onSelectUser
+  currentUser
 }) => {
   const [activeTab, setActiveTab] = useState<'matrix' | 'users'>('matrix');
   const [searchUser, setSearchUser] = useState('');
@@ -44,6 +43,20 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
   // User Modal State
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
   const [userForm, setUserForm] = useState<Omit<User, 'id'>>({
     username: '',
     nama: '',
@@ -202,9 +215,15 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
       id,
       username: userForm.username,
       nama: userForm.nama,
+      nip: userForm.nip,
       role: userForm.role,
       unit: userForm.unit,
-      jabatan: userForm.jabatan
+      jabatan: userForm.jabatan,
+      email: userForm.email,
+      status: userForm.status,
+      bank: userForm.bank,
+      rekening: userForm.rekening,
+      npwp: userForm.npwp
     };
     
     try {
@@ -222,17 +241,35 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
     }
   };
 
-  const handleDeleteUser = async (id: string) => {
-    if (confirm('Yakin ingin menghapus akses pengguna ini?')) {
-      await supabase.from('users_rbac').delete().eq('id', id);
-      setUsers(users.filter(u => u.id !== id));
-    }
+  const handleDeleteUser = (id: string, namaPengguna?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Akses Pengguna',
+      message: `Apakah Anda yakin ingin menghapus akun akses ${namaPengguna ? `"${namaPengguna}"` : ''}? Pengguna tidak akan dapat login kembali ke sistem.`,
+      confirmText: 'Ya, Hapus Pengguna',
+      cancelText: 'Batal',
+      isDanger: true,
+      onConfirm: async () => {
+        setUsers(prev => prev.filter(u => u.id !== id));
+        try {
+          await supabase.from('users_rbac').delete().eq('id', id);
+        } catch (err) {
+          console.error('Error deleting user from supabase:', err);
+        }
+      }
+    });
   };
 
-  const handleToggleStatus = (u: User) => {
+  const handleToggleStatus = async (u: User) => {
     if (!canManageUsers) return;
     const newStatus = u.status === 'aktif' ? 'nonaktif' : 'aktif';
-    setUsers(users.map(item => item.id === u.id ? { ...item, status: newStatus } : item));
+    try {
+      await supabase.from('users_rbac').update({ status: newStatus }).eq('id', u.id);
+      setUsers(users.map(item => item.id === u.id ? { ...item, status: newStatus } : item));
+    } catch (err) {
+      console.error(err);
+      alert('Gagal memperbarui status akun di database');
+    }
   };
 
   return (
@@ -447,7 +484,7 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
                     <th className="py-3.5 px-3 text-center">Peran (Role)</th>
                     <th className="py-3.5 px-3">Rekening Payroll</th>
                     <th className="py-3.5 px-3 text-center">Status Akun</th>
-                    <th className="py-3.5 px-3 text-center">Aksi Persona</th>
+                    <th className="py-3.5 px-3 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-slate-200">
@@ -497,15 +534,6 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
                       </td>
                       <td className="py-3.5 px-3 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center space-x-1.5">
-                          {/* Live Persona Test Switcher */}
-                          <button
-                            onClick={() => onSelectUser(u)}
-                            className="px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-[10px] font-bold transition"
-                            title="Masuk Sebagai Persona Ini"
-                          >
-                            Uji Persona
-                          </button>
-
                           {canManageUsers && (
                             <>
                               <button
@@ -516,7 +544,7 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
                                 <Edit3 className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => handleDeleteUser(u.id)}
+                                onClick={() => handleDeleteUser(u.id, u.nama)}
                                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
                                 title="Hapus Akun"
                               >
@@ -668,6 +696,18 @@ export const RbacMatrixManager: React.FC<RbacMatrixManagerProps> = ({
           </div>
         </div>
       )}
+
+      {/* CONFIRM MODAL */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        isDanger={confirmModal.isDanger !== false}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
 
     </div>
   );

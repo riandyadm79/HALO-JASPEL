@@ -57,16 +57,18 @@ export interface JaspelPaguBreakdown {
 
 export const calculatePaguJaspel = (
   pendapatanKotor: number,
-  proporsiPersen: number,
-  biayaOperasional: number,
+  proporsiPersen: number = 40,
+  biayaOperasional: number = 0,
   medisPersen: number = 60,
   nonKlinisPersen: number = 30,
   manajemenPersen: number = 10
 ): JaspelPaguBreakdown => {
+  // Nilai pendapatan diambil 40% sebagai Pagu Jasa Pelayanan
   const paguKotor = Math.round(pendapatanKotor * (proporsiPersen / 100));
-  // Pagu netto disesuaikan dengan biaya operasional/beban tetap proporsional jika ada
-  const cadanganBeban = Math.min(biayaOperasional * 0.2, paguKotor * 0.1); 
-  const paguNetto = Math.max(0, paguKotor - cadanganBeban);
+  // Pagu netto: jika ada pemotongan beban operasional langsung atau default pagu kotor
+  const paguNetto = biayaOperasional > 0 && biayaOperasional < paguKotor 
+    ? paguKotor - Math.min(biayaOperasional, Math.round(paguKotor * 0.1))
+    : paguKotor;
 
   const jasaMedisKlinis = Math.round(paguNetto * (medisPersen / 100));
   const jasaNonKlinis = Math.round(paguNetto * (nonKlinisPersen / 100));

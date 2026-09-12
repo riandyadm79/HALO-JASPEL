@@ -30,7 +30,9 @@ import {
   ChevronRight,
   Sun,
   Moon,
-  TrendingUp
+  TrendingUp,
+  Printer,
+  Building2
 } from 'lucide-react';
 import { User, RoleType, InstalasiLayananType } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -74,6 +76,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (setSelectedCategory) setSelectedCategory('all');
       },
       isActive: activeTab === 'alokasi' && selectedCategory === 'all'
+    },
+    {
+      id: 'indeks-jasa-langsung',
+      name: 'Indeks Jasa Langsung',
+      icon: Stethoscope,
+      type: 'instalasi',
+      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[],
+      onClick: () => {
+        setActiveTab('indeks_jasa');
+        if (setSelectedCategory) setSelectedCategory('all');
+      },
+      isActive: activeTab === 'indeks_jasa' && (!selectedCategory || selectedCategory === 'all')
     },
     {
       id: 'indeks-pegawai',
@@ -171,6 +185,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // System & Management Tools
   const systemTools = [
+    {
+      id: 'rekap_cetak',
+      label: 'Rekapitulasi & Cetak Tabel',
+      icon: Printer,
+      roles: ['superadmin', 'perumus', 'pic', 'staf'] as RoleType[],
+      isActive: activeTab === 'rekap_cetak',
+      onClick: () => setActiveTab('rekap_cetak')
+    },
     {
       id: 'visualisasi',
       label: 'Visualisasi & Tren',
@@ -312,20 +334,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="space-y-0.5">
+            {/* Overview All Units Button */}
+            <button
+              onClick={() => {
+                setActiveTab('indeks_jasa');
+                if (setSelectedCategory) setSelectedCategory('all');
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all mb-1.5 ${
+                activeTab === 'indeks_jasa' && (!selectedCategory || selectedCategory === 'all')
+                  ? 'bg-amber-400 text-slate-950 font-black shadow-md border border-amber-300'
+                  : theme === 'light'
+                  ? 'bg-blue-50/80 text-blue-900 font-bold hover:bg-blue-100 border border-blue-200/60'
+                  : 'bg-blue-950/70 text-blue-200 font-bold hover:bg-blue-900/80 border border-blue-800/60'
+              }`}
+            >
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className={`p-1 rounded-md transition-colors ${
+                  activeTab === 'indeks_jasa' && (!selectedCategory || selectedCategory === 'all')
+                    ? 'bg-slate-950 text-amber-300'
+                    : 'bg-blue-900/30 text-blue-400'
+                }`}>
+                  <Building2 className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-black">Semua Instalasi & Staf</span>
+              </div>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                activeTab === 'indeks_jasa' && (!selectedCategory || selectedCategory === 'all')
+                  ? 'bg-slate-950 text-amber-300'
+                  : 'bg-blue-900/40 text-blue-300'
+              }`}>
+                10 UNIT
+              </span>
+            </button>
+
             {instalasiLayanan.map((unit) => {
               const Icon = unit.icon;
-              const isSelected = activeTab === 'alokasi' && selectedCategory === unit.name;
+              const isSelected = activeTab === 'indeks_jasa' && selectedCategory === unit.name;
 
               return (
                 <button
                   key={unit.name}
                   onClick={() => {
-                    setActiveTab('alokasi');
+                    setActiveTab('indeks_jasa');
                     if (setSelectedCategory) setSelectedCategory(unit.name);
                   }}
                   className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-left transition-all ${
                     isSelected
-                      ? 'bg-blue-600 text-white font-bold shadow-sm border border-blue-400/40'
+                      ? 'bg-blue-600 text-white font-bold shadow-md border border-blue-400/50'
                       : theme === 'light'
                       ? 'text-slate-700 font-medium hover:bg-slate-100 hover:text-blue-900'
                       : 'text-slate-200 font-medium hover:bg-blue-950/60 hover:text-white'
@@ -346,7 +401,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                   {isSelected && (
                     <span className="text-[9px] px-1.5 py-0.2 bg-amber-400 text-blue-950 font-black rounded-md">
-                      FILTER
+                      BUKA TABEL
                     </span>
                   )}
                 </button>

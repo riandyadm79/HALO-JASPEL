@@ -13,7 +13,7 @@ import {
   FileCheck2
 } from 'lucide-react';
 import { AlokasiJaspel, PenerimaAlokasi, GeneralIndexItem, CostCenterItem, RevenueCenterItem, User } from '../types';
-import { HospitalProfile, DEFAULT_HOSPITAL_PROFILE } from './HospitalProfileModal';
+import { HospitalProfile, DEFAULT_HOSPITAL_PROFILE } from '../types';
 import { 
   exportToXLSX, 
   exportDatabaseToXLSX, 
@@ -24,9 +24,13 @@ import {
   downloadCsvTemplatePenerima,
   downloadCsvTemplateSupabasePenerima,
   downloadCsvTemplateIndeksJasa,
-  downloadCsvTemplateGeneralIndex
+  downloadCsvTemplateGeneralIndex,
+  downloadCsvTemplateManajemenDana,
+  downloadCsvTemplateRekapKinerjaPelayanan
 } from '../utils/exportImport';
 import { formatRupiah, formatNumber } from '../utils/calculations';
+import { supabase } from '../lib/supabase';
+import { ConfirmModal } from './ConfirmModal';
 
 interface ExportImportCenterProps {
   alokasiList: AlokasiJaspel[];
@@ -58,6 +62,20 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
   const [importedRows, setImportedRows] = useState<Record<string, unknown>[]>([]);
   const [importFileName, setImportFileName] = useState<string>('');
   const [importSuccessMessage, setImportSuccessMessage] = useState<string>('');
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
 
   const selectedAlokasi = alokasiList.find(a => a.id === selectedAlokasiId) || alokasiList[0];
   const currentPenerima = penerimaList.filter(p => p.alokasiId === selectedAlokasi?.id);
@@ -97,7 +115,7 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
     }
   };
 
-  const handleCommitImport = () => {
+  const handleCommitImport = async () => {
     if (importedRows.length === 0) return;
 
     if (importTarget === 'penerima' && selectedAlokasi) {
@@ -136,10 +154,37 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
         };
       });
 
-      setPenerimaList([...penerimaList, ...newPenerima]);
-      setImportSuccessMessage(`Berhasil mengimpor ${newPenerima.length} baris staf ke periode ${selectedAlokasi.bulan} ${selectedAlokasi.tahun}!`);
-      setImportedRows([]);
-      setImportFileName('');
+      try {
+        const payloads = newPenerima.map(p => ({
+          id: p.id,
+          alokasi_id: p.alokasiId,
+          pegawai_id: p.pegawaiId,
+          nama: p.nama,
+          unit_kerja: p.unitKerja,
+          jabatan: p.jabatan,
+          kategori: p.kategori,
+          poin_dasar: p.poinDasar,
+          poin_kompetensi: p.poinKompetensi,
+          poin_risiko: p.poinRisiko,
+          poin_kinerja: p.poinKinerja,
+          total_poin: p.totalPoin,
+          nilai_per_poin: p.nilaiPerPoin,
+          bruto_jaspel: p.brutoJaspel,
+          pajak_pph21_persen: p.pajakPph21Persen,
+          potongan_pph21: p.potonganPph21,
+          netto_diterima: p.nettoDiterima,
+          status_koreksi: p.statusKoreksi,
+          sudah_dibayar: p.sudahDibayar
+        }));
+        await supabase.from('penerima_alokasi').insert(payloads);
+        setPenerimaList([...penerimaList, ...newPenerima]);
+        setImportSuccessMessage(`Berhasil mengimpor ${newPenerima.length} baris staf ke database Supabase periode ${selectedAlokasi.bulan} ${selectedAlokasi.tahun}!`);
+        setImportedRows([]);
+        setImportFileName('');
+      } catch (err) {
+        console.error(err);
+        alert('Gagal mengimpor penerima ke Supabase: ' + String(err));
+      }
     } else if (importTarget === 'generalIndex') {
       const newGeneral: GeneralIndexItem[] = importedRows.map((row, idx) => ({
         id: `idx-imp-${Date.now()}-${idx}`,
@@ -158,10 +203,32 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
         statusPegawai: (row['Status Pegawai'] || 'PNS') as any
       }));
 
-      setGeneralIndexList([...generalIndexList, ...newGeneral]);
-      setImportSuccessMessage(`Berhasil mengimpor ${newGeneral.length} pegawai ke master General Index!`);
-      setImportedRows([]);
-      setImportFileName('');
+      try {
+        const payloads = newGeneral.map(g => ({
+          id: g.id,
+          kode: g.kode,
+          nama_pegawai: g.namaPegawai,
+          nip: g.nip,
+          unit_kerja: g.unitKerja,
+          golongan: g.golongan,
+          pendidikan: g.pendidikan,
+          masa_kerja_tahun: g.masaKerjaTahun,
+          skor_dasar: g.skorDasar,
+          skor_kompetensi: g.skorKompetensi,
+          skor_risiko: g.skorRisiko,
+          skor_kinerja: g.skorKinerja,
+          bobot_presensi: g.bobotPresensi,
+          status_pegawai: g.statusPegawai
+        }));
+        await supabase.from('general_index').insert(payloads);
+        setGeneralIndexList([...generalIndexList, ...newGeneral]);
+        setImportSuccessMessage(`Berhasil mengimpor ${newGeneral.length} pegawai ke master General Index Supabase!`);
+        setImportedRows([]);
+        setImportFileName('');
+      } catch (err) {
+        console.error(err);
+        alert('Gagal mengimpor General Index ke Supabase: ' + String(err));
+      }
     }
   };
 
@@ -424,6 +491,24 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
                   <span>4. Supabase: general_index</span>
                   <Download className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                 </button>
+                <button
+                  type="button"
+                  onClick={downloadCsvTemplateManajemenDana}
+                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-bold border border-slate-700 transition flex items-center justify-between"
+                  title="Templat CSV Distribusi Proporsional Dana Jaspel RSUD (Aturan 40% Pagu Jaspel)"
+                >
+                  <span>5. Format CSV Distribusi Dana (Pagu 40%)</span>
+                  <Download className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadCsvTemplateRekapKinerjaPelayanan}
+                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-300 font-bold border border-slate-700 transition flex items-center justify-between"
+                  title="Templat CSV Rekapitulasi Kinerja Pelayanan & Poin Pegawai Jasa Langsung"
+                >
+                  <span>6. Format CSV Rekap Kinerja Pelayanan (10 Unit)</span>
+                  <Download className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                </button>
               </div>
             </div>
 
@@ -431,18 +516,31 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
               <div>
                 <span className="text-xs font-bold text-rose-300 block">Kosongkan Data Penerima</span>
-                <span className="text-[10px] text-slate-400">Hapus seluruh data nama penerima lama dari Local Storage.</span>
+                <span className="text-[10px] text-slate-400">Hapus permanen seluruh data penerima jaspel dari database Supabase.</span>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm('Apakah Anda yakin ingin MENGHAPUS SELURUH DATA PENERIMA yang tersimpan di Local Storage? Data yang terhapus tidak dapat dikembalikan.')) {
-                    setPenerimaList([]);
-                    localStorage.removeItem('halo_japel_penerima_list');
-                    alert('Seluruh data penerima lama telah berhasil dikosongkan!');
-                  }
+                  setConfirmModal({
+                    isOpen: true,
+                    title: 'Kosongkan Seluruh Data Penerima',
+                    message: 'Apakah Anda yakin ingin MENGHAPUS SELURUH DATA PENERIMA dari database Supabase? Tindakan ini bersifat permanen dan data yang terhapus tidak dapat dikembalikan.',
+                    confirmText: 'Ya, Kosongkan Data',
+                    cancelText: 'Batal',
+                    isDanger: true,
+                    onConfirm: async () => {
+                      try {
+                        await supabase.from('penerima_alokasi').delete().neq('id', 'keep_none_placeholder');
+                        setPenerimaList([]);
+                        localStorage.removeItem('halo_japel_penerima_list');
+                        setImportSuccessMessage('Seluruh data penerima telah berhasil dikosongkan.');
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }
+                  });
                 }}
-                className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 font-bold text-xs border border-rose-800/80 transition"
+                className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 font-bold text-xs border border-rose-800/80 transition cursor-pointer"
               >
                 Kosongkan Data Penerima
               </button>
@@ -496,6 +594,18 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
         </div>
 
       </div>
+
+      {/* CONFIRM MODAL */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        isDanger={confirmModal.isDanger !== false}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
 
     </div>
   );

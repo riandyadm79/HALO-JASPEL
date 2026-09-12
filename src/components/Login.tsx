@@ -8,7 +8,7 @@ interface LoginProps {
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -19,61 +19,72 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError('');
 
     try {
-      if (import.meta.env.VITE_SUPABASE_URL === undefined || import.meta.env.VITE_SUPABASE_URL === '') {
-        // Fallback for simulation if no Supabase configured
-        console.warn("Simulating login since no Supabase URL is set");
-        setTimeout(() => {
-          onLogin({
-            id: 'sim-' + Date.now(),
-            nama: email.split('@')[0] || 'Super Admin',
-            role: 'superadmin', 
-            unit: 'Manajemen',
-            jabatan: 'Direktur'
-          });
-        }, 1000);
+      const cleanInput = identifier.trim();
+
+      // 1. If user typed an email, try Supabase Auth
+      if (cleanInput.includes('@')) {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: cleanInput,
+          password: password,
+        });
+
+        if (!authError && authData?.user) {
+          const { data: userData } = await supabase
+            .from('users_rbac')
+            .select('*')
+            .ilike('email', cleanInput)
+            .maybeSingle();
+
+          if (userData) {
+            onLogin({
+              id: String(userData.id),
+              nama: userData.nama,
+              role: userData.role,
+              unit: userData.unit || '',
+              jabatan: userData.jabatan || '',
+              email: userData.email || cleanInput
+            });
+            return;
+          } else {
+            onLogin({
+              id: authData.user.id,
+              nama: authData.user.email?.split('@')[0] || 'Pengguna',
+              role: 'staf',
+              unit: '',
+              jabatan: '',
+              email: cleanInput
+            });
+            return;
+          }
+        }
+      }
+
+      // 2. Query users_rbac by email or username
+      const { data: rbacUser, error: rbacError } = await supabase
+        .from('users_rbac')
+        .select('*')
+        .or(`email.ilike.${cleanInput},username.ilike.${cleanInput}`)
+        .maybeSingle();
+
+      if (rbacError) {
+        console.warn('RBAC query error:', rbacError.message);
+      }
+
+      if (rbacUser) {
+        onLogin({
+          id: String(rbacUser.id),
+          nama: rbacUser.nama,
+          role: rbacUser.role,
+          unit: rbacUser.unit || '',
+          jabatan: rbacUser.jabatan || '',
+          email: rbacUser.email || cleanInput
+        });
         return;
       }
 
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (authError) {
-        throw authError;
-      }
-
-      // Fetch user role from users_rbac
-      const { data: userData, error: userError } = await supabase
-        .from('users_rbac')
-        .select('*')
-        .eq('email', email)
-        .single();
-
-      if (userError && userError.code !== 'PGRST116') {
-        throw userError;
-      }
-
-      if (userData) {
-        onLogin({
-          id: userData.id,
-          nama: userData.nama,
-          role: userData.role,
-          unit: userData.unit || '',
-          jabatan: userData.jabatan || ''
-        });
-      } else {
-        // Fallback if not in users_rbac
-        onLogin({
-          id: authData.user.id,
-          nama: authData.user.email?.split('@')[0] || 'User',
-          role: 'staf', // Default role
-          unit: '',
-          jabatan: ''
-        });
-      }
+      throw new Error('Email atau username tidak terdaftar, atau kata sandi tidak valid.');
     } catch (err: any) {
-      setError(err.message || 'Gagal login. Periksa kembali email dan password Anda.');
+      setError(err.message || 'Gagal login. Periksa kembali data login Anda.');
     } finally {
       setLoading(false);
     }
@@ -81,22 +92,21 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#07090e] p-4 font-sans selection:bg-amber-400 selection:text-slate-950">
-      <div className="w-full max-w-md bg-[#0c1633] rounded-3xl p-8 border border-blue-900/50 shadow-2xl">
-        <div className="flex flex-col items-center justify-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1d4ed8] via-[#1e3a8a] to-[#0f172a] border border-blue-400/40 flex items-center justify-center shadow-lg shadow-blue-950/60 mb-4">
+      <div className="w-full max-w-md bg-[#0c1633] rounded-3xl p-6 sm:p-8 border border-blue-900/50 shadow-2xl">
+        <div className="flex flex-col items-center justify-center mb-6">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1d4ed8] via-[#1e3a8a] to-[#0f172a] border border-blue-400/40 flex items-center justify-center shadow-lg shadow-blue-950/60 mb-3">
             <span className="font-black text-amber-300 text-2xl tracking-tighter">HJ</span>
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white">
             HALO <span className="text-amber-400">JASPEL</span>
           </h1>
           <p className="text-xs text-blue-200/70 mt-1 font-medium text-center">
-            Pola Distribusi Jasa Pelayanan RS<br />
-            BLUD 2026
+            RSJD Atma Husada Mahakam • Distribusi Jasa Pelayanan BLUD 2026
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium flex items-center gap-2">
+          <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -104,22 +114,27 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Email Akses</label>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              Email atau Username
+            </label>
             <div className="relative">
               <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 className="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-2.5 pl-9 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
-                placeholder="email@rsud.com"
+                placeholder="Masukkan email atau username"
+                autoComplete="username"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Password</label>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              Password
+            </label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -128,7 +143,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-slate-900/80 border border-slate-700 rounded-xl py-2.5 pl-9 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
-                placeholder="••••••••"
+                placeholder="Masukkan password"
+                autoComplete="current-password"
               />
             </div>
           </div>
@@ -137,7 +153,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2"
+              className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 active:scale-98"
             >
               {loading ? 'Memverifikasi...' : (
                 <>
@@ -148,12 +164,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </button>
           </div>
         </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-[10px] text-slate-500">
-            Pastikan Anda memiliki kredensial dari administrator Supabase.
-          </p>
-        </div>
       </div>
     </div>
   );

@@ -115,6 +115,17 @@ export interface PenerimaAlokasi {
   statusKoreksi: 'Sesuai' | 'Usulan Koreksi' | 'Disetujui Koreksi';
   catatanKoreksi?: string;
   sudahDibayar: boolean;
+
+  // Extended Post Remunerasi & Administrasi Fields
+  jaspelPostRemunerasi?: number;
+  postPenyesuaianBebanKerja?: number;
+  jaspelPostTotal?: number;
+  persenAdministrasi?: string;
+  kelompokJasa?: string;
+  kelompokRekap?: string;
+  kelompokPelayanan?: string;
+  nip?: string;
+  golongan?: string;
 }
 
 // Database Manajer: General Index
@@ -193,6 +204,7 @@ export interface IndeksJasaLangsungItem {
   id: string;
   kode?: string;
   instalasiLayanan: string;
+  namaPegawai?: string;
   kategori?: string;
   kinerja1: number;
   kinerja2: number;
@@ -202,6 +214,57 @@ export interface IndeksJasaLangsungItem {
   rupiahPerPoin1: number;
   rupiahPerPoin2: number;
   nilaiJpLangsung: number;
+}
+
+// Rekapitulasi Poin Kinerja Pelayanan: Instalasi / Layanan (Macro Level)
+export interface UnitKinerjaLayanan {
+  id: string;
+  kodeUnit: string; // e.g. "GIZI", "FARMASI", "LABORATORIUM"
+  namaUnit: string; // e.g. "Gizi", "Farmasi", "Laboratorium"
+  kategori: string; // "Nakes Ber-Tarif" | "Nakes Non-Tarif"
+  bulan: string; // e.g. "Agustus"
+  tahun: number; // e.g. 2026
+  indikator1: string; // e.g. "Jumlah Diet Pasien", "Pengelolaan Perbekalan Farmasi"
+  volumeTotal1: number;
+  indikator2: string; // e.g. "Asuhan Gizi", "Telaah / Verifikasi"
+  volumeTotal2: number;
+  indikator3: string; // e.g. "Pengawasan Mutu Makanan", "KIE"
+  volumeTotal3: number;
+  paguJp: number;
+  totalPoin: number;
+  rupiahPerPoin: number;
+  realisasiJp: number;
+  jumlahPegawai: number;
+  subPorsiPagu?: {
+    apotekerPorsiPersen?: number;
+    apotekerPagu?: number;
+    asistenApotekerPorsiPersen?: number;
+    asistenApotekerPagu?: number;
+  };
+  status: 'Draft' | 'Verifikasi' | 'Final';
+}
+
+// Rekapitulasi Poin Kinerja Pelayanan: Pegawai per Instalasi / Layanan (Micro Level)
+export interface PegawaiKinerjaLayanan {
+  id: string;
+  unitKode: string; // matches UnitKinerjaLayanan.kodeUnit
+  unitNama: string;
+  nama: string;
+  nip?: string;
+  subKategori?: string; // e.g. "Apoteker", "Asisten Apoteker", "Okupasi Terapi", "Terapi Wicara"
+  prestasi1: number;
+  totalBulan1: number;
+  poin1: number;
+  prestasi2: number;
+  totalBulan2: number;
+  poin2: number;
+  prestasi3: number;
+  totalBulan3: number;
+  poin3: number;
+  jumlahPoin: number; // e.g. 1.03
+  persenPoin: number; // e.g. 34%
+  jpLangsung: number; // e.g. 1595921.34
+  keterangan?: string;
 }
 
 export interface IndeksJasaHeaderConfig {
@@ -242,6 +305,42 @@ export interface SupabaseConfig {
   lastPullDate?: string;
   connected: boolean;
 }
+
+export interface HospitalProfile {
+  hospitalName: string;
+  subtitle: string;
+  hospitalType: string;
+  badgeText: string;
+  badgeColor: string;
+  pemdaName: string;
+  address: string;
+  city: string;
+  phone: string;
+  directorName: string;
+  directorNip: string;
+  directorTitle: string;
+  committeeLeadName: string;
+  committeeLeadNip: string;
+  committeeLeadTitle: string;
+}
+
+export const DEFAULT_HOSPITAL_PROFILE: HospitalProfile = {
+  hospitalName: "RSJD ATMA HUSADA MAHAKAM",
+  subtitle: "Sistem Jaspel & Remunerasi 2026",
+  hospitalType: "RUMAH SAKIT JIWA DAERAH",
+  badgeText: "PROVINSI KALIMANTAN TIMUR",
+  badgeColor: "amber",
+  pemdaName: "PEMERINTAH PROVINSI KALIMANTAN TIMUR",
+  address: "Jl. Kakap No. 23",
+  city: "Samarinda",
+  phone: "(0541) 743364",
+  directorName: "dr. H. Jaya Mualimin, Sp.KJ, M.Kes, MARS",
+  directorNip: "19720515 200212 1 004",
+  directorTitle: "Direktur",
+  committeeLeadName: "Ketua Tim Remunerasi",
+  committeeLeadNip: "-",
+  committeeLeadTitle: "Ketua Komite",
+};
 
 export type ThemeMode = 'light' | 'dark';
 

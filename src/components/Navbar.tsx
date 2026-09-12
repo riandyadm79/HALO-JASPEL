@@ -5,21 +5,22 @@ import {
   Cloud, 
   Menu, 
   UserCheck, 
-  ChevronDown, 
+  LogOut, 
   Sparkles,
   Layers,
   FileSpreadsheet,
   Sun,
   Moon,
-  TrendingUp
+  TrendingUp,
+  Printer
 } from 'lucide-react';
 import { User, RoleType } from '../types';
 import { useTheme } from '../context/ThemeContext';
 
 interface NavbarProps {
   currentUser: User;
-  users: User[];
-  onSelectUser: (user: User) => void;
+  users?: User[];
+  onLogout: () => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   rlsEnabled: boolean;
@@ -30,8 +31,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
-  users,
-  onSelectUser,
+  onLogout,
   activeTab,
   setActiveTab,
   rlsEnabled,
@@ -40,7 +40,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   isMobileMenuOpen
 }) => {
   const { theme, toggleTheme } = useTheme();
-  const [dropdownOpen, setDropdownOpen] = React.useState(false);
 
 
   const getRoleBadge = (role?: RoleType) => {
@@ -115,6 +114,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </button>
 
+            {/* Rekapitulasi & Cetak Quick Button */}
+            <button
+              onClick={() => setActiveTab('rekap_cetak')}
+              className={`hidden sm:flex items-center space-x-1.5 px-3 py-1.5 sm:py-2 rounded-xl border transition-all text-xs font-bold ${
+                activeTab === 'rekap_cetak'
+                  ? 'bg-amber-400 text-slate-950 border-amber-500 shadow-md shadow-amber-400/20'
+                  : 'bg-blue-950/60 text-slate-200 border-blue-800/80 hover:border-amber-400 hover:text-white'
+              }`}
+              title="Buka Dokumen Rekapitulasi & Cetak Tabel Jaspel"
+            >
+              <Printer className={`w-3.5 h-3.5 ${activeTab === 'rekap_cetak' ? 'text-slate-950' : 'text-amber-400'}`} />
+              <span>Rekap & Cetak</span>
+            </button>
+
             {/* Visualisasi Dashboard Quick Button */}
             <button
               onClick={() => setActiveTab('visualisasi')}
@@ -153,86 +166,36 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
 
-            {/* Persona / User Switcher */}
-            <div className="relative">
+            {/* Authenticated User Profile (Fixed - No switcher dropdown) */}
+            <div className="flex items-center space-x-2.5 px-3 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-blue-950 to-slate-900 border border-blue-800/70 text-left shadow-sm">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border ${
+                currentUser?.role === 'superadmin' ? 'bg-blue-800 text-blue-200 border-blue-600' :
+                currentUser?.role === 'perumus' ? 'bg-amber-800 text-amber-200 border-amber-600' :
+                currentUser?.role === 'pic' ? 'bg-indigo-800 text-indigo-200 border-indigo-600' :
+                'bg-slate-800 text-slate-300 border-slate-600'
+              }`}>
+                {(currentUser?.nama || 'U').charAt(0)}
+              </div>
+              <div className="hidden sm:block text-left">
+                <p className="text-xs font-bold text-white truncate max-w-[130px]">
+                  {currentUser?.nama || 'Pengguna'}
+                </p>
+                <div className="flex items-center space-x-1 mt-0.5">
+                  <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border uppercase ${badge.bg}`}>
+                    {badge.label}
+                  </span>
+                </div>
+              </div>
+
+              {/* Logout Button */}
               <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center space-x-2.5 px-3 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-blue-950 to-slate-900 border border-blue-800/70 hover:border-amber-400 transition-all text-left shadow-sm"
+                onClick={onLogout}
+                className="ml-1 sm:ml-2 p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 border border-rose-500/30 transition active:scale-95 flex items-center space-x-1"
+                title="Keluar / Logout Akun"
               >
-                <div className="w-8 h-8 rounded-lg bg-blue-900 text-amber-300 font-bold flex items-center justify-center text-xs border border-blue-400/30">
-                  {(currentUser?.nama || 'U').charAt(0)}
-                </div>
-                <div className="hidden sm:block text-left">
-                  <p className="text-xs font-bold text-white truncate max-w-[130px]">
-                    {currentUser?.nama || 'Pengguna'}
-                  </p>
-                  <p className="text-[10px] text-amber-400/90 font-medium truncate max-w-[130px]">
-                    {currentUser?.jabatan || 'Staf Medis'}
-                  </p>
-                </div>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-bold hidden md:inline">Keluar</span>
               </button>
-
-              {/* Persona Switcher Dropdown */}
-              {dropdownOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-40"
-                    onClick={() => setDropdownOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-72 sm:w-80 rounded-2xl bg-[#0f1d38] border border-blue-800 shadow-2xl z-50 p-3 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-3 py-2 border-b border-blue-900/80 mb-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-blue-300">
-                          Ganti Peran / User Matrix
-                        </span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.bg}`}>
-                          {badge.label}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-blue-200/70 mt-1">
-                        Pilih persona untuk menguji hak akses RBAC, tampilan slip, dan batasan tombol.
-                      </p>
-                    </div>
-
-                    <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
-                      {(users || []).map(u => (
-                        <button
-                          key={u.id}
-                          onClick={() => {
-                            onSelectUser(u);
-                            setDropdownOpen(false);
-                          }}
-                          className={`w-full flex items-center space-x-3 p-2 rounded-xl text-left transition ${
-                            u.id === currentUser?.id 
-                              ? 'bg-blue-900/80 border border-amber-400/60 text-amber-200' 
-                              : 'hover:bg-blue-950/80 text-slate-300'
-                          }`}
-                        >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                            u.role === 'superadmin' ? 'bg-blue-800 text-blue-200' :
-                            u.role === 'perumus' ? 'bg-amber-900 text-amber-200' :
-                            u.role === 'pic' ? 'bg-indigo-900 text-indigo-200' : 'bg-slate-800 text-slate-300'
-                          }`}>
-                            {(u.nama || 'U').charAt(0)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold truncate text-white">
-                              {u.nama}
-                            </p>
-                            <p className="text-[10px] text-slate-400 truncate">
-                              {u.jabatan} • <span className="text-amber-400 font-medium uppercase">{u.role}</span>
-                            </p>
-                          </div>
-                          {u.id === currentUser?.id && (
-                            <div className="w-2 h-2 rounded-full bg-amber-400" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
             </div>
 
           </div>

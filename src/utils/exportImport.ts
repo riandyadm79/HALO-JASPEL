@@ -471,7 +471,142 @@ export const downloadCsvTemplateGeneralIndex = () => {
   downloadBlobAsFile(csvContent, 'SUPABASE_TABEL_general_index.csv');
 };
 
-const downloadBlobAsFile = (content: string, filename: string) => {
+export const downloadCsvTemplateManajemenDana = () => {
+  const lines = [
+    '# TEMPLATE DISTRIBUSI PROPORSIONAL DANA JASPEL RSUD',
+    '# ATURAN: 40% NILAI PENDAPATAN SEBAGAI PAGU JASA PELAYANAN, 60% JASA SARANA',
+    'kategori_besar,kelompok_layanan,porsi_persen,alokasi_rupiah,personel,rata_rata_per_orang,keterangan',
+    'Beban Tetap,Tim Perumus Jaspel,1.50,17158256,14,1225590,Beban Tetap 1.5% Pagu JP',
+    'Beban Tetap,Pengelola BLUD (Ketua),18.22,9476790,1,9476790,Penyesuaian Risiko 4.5%',
+    'Beban Tetap,Pengelola Keuangan BLUD,15.69,8160000,1,8160000,Penyesuaian Risiko',
+    'Beban Tetap,Pengelola Teknis BLUD I,15.69,8160000,1,8160000,Penyesuaian Risiko',
+    'Beban Tetap,Pengelola Teknis BLUD II,15.69,8160000,1,8160000,Penyesuaian Risiko',
+    'Beban Tetap,Dewan Pengawas (Ketua),6.38,3316877,1,3316877,Dewas',
+    'Beban Tetap,Dewan Pengawas (Anggota),7.29,3790716,2,1895358,Dewas',
+    'Beban Tetap,Dewan Pengawas (Sekretaris),1.82,947679,1,947679,Dewas',
+    'Beban Tetap,Proporsi Keahlian & Profesi MOU,0.00,10000000,1,10000000,MOU Khusus',
+    'Jasa Tidak Langsung,Direktur,10.33,11875000,1,11875000,Struktural',
+    'Jasa Tidak Langsung,Wakil Direktur,25.45,29250000,3,9750000,Struktural',
+    'Jasa Tidak Langsung,Kabag / Kabid,46.29,5320000,8,6650000,Struktural',
+    'Jasa Tidak Langsung,Jafung Disetarakan,1.74,2000000,1,2000000,Struktural',
+    'Jasa Tidak Langsung,Administrasi,16.30,70000000,514,136187,Administrasi Non-Klinis',
+    'Jasa Tidak Langsung,Post Remunerasi,59.30,254703346,424,600715,General Index Pegawai',
+    'Jasa Langsung,Perawat,40.90,263880698,198,1332731,Keperawatan & Kebidanan',
+    'Jasa Langsung,Dokter Umum,27.60,76520425,17,4501201,Tenaga Medis',
+    'Jasa Langsung,Psikiater,48.00,133166201,4,33291550,Tenaga Medis',
+    'Jasa Langsung,Spesialis Non-Psikiatri,14.40,40000000,4,10000000,Tenaga Medis',
+    'Jasa Langsung,Farmasi,39.00,34839607,20,1741980,Nakes Ber-Tarif',
+    'Jasa Langsung,Analis Laboratorium,18.00,16079819,11,1461802,Nakes Ber-Tarif',
+    'Jasa Langsung,Psikolog Klinis,7.50,6699924,2,3349962,Nakes Ber-Tarif',
+    'Jasa Langsung,Okupasi Terapis & Wicara,15.00,13399849,6,2233308,Nakes Ber-Tarif',
+    'Jasa Langsung,Fisioterapis,7.50,6699924,4,1674981,Nakes Ber-Tarif',
+    'Jasa Langsung,Radiografer / Radiologi,7.50,6699924,3,2233308,Nakes Ber-Tarif',
+    'Jasa Langsung,Nutrisionist / Gizi,5.50,4913278,3,1637759,Nakes Ber-Tarif',
+    'Jasa Langsung,Elektromedis,12.00,1745097,2,872548,Nakes Non-Tarif',
+    'Jasa Langsung,Kesehatan Lingkungan,30.00,4362742,5,872548,Nakes Non-Tarif',
+    'Jasa Langsung,Rekam Medik,58.00,8434634,8,1054329,Nakes Non-Tarif'
+  ];
+
+  const csvContent = '\uFEFF' + lines.join('\r\n');
+  downloadBlobAsFile(csvContent, 'DISTRIBUSI_DANA_JASPEL_40PERSEN_RSUD.csv');
+};
+
+export const exportDanaDistribusiToCsv = (
+  pendapatan: number,
+  paguJaspel: number,
+  porsiPersen: number,
+  rows: Array<{ kelompok: string; pagu: number; realisasi?: number; selisih?: number; keterangan?: string }>
+) => {
+  const header = [
+    `# LAPORAN RESMI ALUR & DISTRIBUSI DANA JASA PELAYANAN`,
+    `# Nilai Pendapatan: ${pendapatan}`,
+    `# Pagu Jasa Pelayanan (40%): ${paguJaspel}`,
+    `# Proporsi Jaspel: ${porsiPersen}%`,
+    'Kelompok Layanan,Pagu Anggaran (Rp),Realisasi (Rp),Selisih (Rp),Status / Keterangan'
+  ];
+
+  const dataRows = rows.map(r => 
+    `"${r.kelompok}",${r.pagu},${r.realisasi ?? 0},${r.selisih ?? 0},"${r.keterangan || ''}"`
+  );
+
+  const csvContent = '\uFEFF' + [...header, ...dataRows].join('\r\n');
+  downloadBlobAsFile(csvContent, `ALUR_DISTRIBUSI_DANA_JASPEL_${porsiPersen}PERSEN.csv`);
+};
+
+export const downloadCsvTemplateRekapKinerjaPelayanan = () => {
+  const lines = [
+    '# TEMPLAT REKAPITULASI POIN KINERJA PELAYANAN (JASA LANGSUNG RSUD)',
+    '# BULAN: AGUSTUS 2026',
+    '# UNIT / INSTALASI: Gizi',
+    '# PAGU JASA PELAYANAN (Rp): 4669497.15',
+    '# TOTAL POIN: 3',
+    '# RUPIAH PER POIN: 1556499.05',
+    '',
+    'No;Nama;Prestasi Jumlah Diet Pasien;Total Diet;Prestasi Asuhan Gizi;Total Asuhan;Prestasi Pengawasan Mutu;Total Pengawasan;Poin 1;Poin 2;Poin 3;Jumlah Poin;JP Langsung (Rp.);Persentase;Kategori / Profesi',
+    '1;"Nurhikmah, S.Gz";509;1198;28;114;11;31;0.4;0.2;0.4;1.03;1595921.34;34%;"Nutrisionis"',
+    '2;"Devi Ester Yuantris S.Gz";509;1198;36;114;11;31;0.4;0.3;0.4;1.10;1705149.34;37%;"Nutrisionis"',
+    '3;"Priskila Iriana Kamasi,A.Md.Gz";180;1198;50;114;9;31;0.2;0.4;0.3;0.88;1368426.47;29%;"Nutrisionis"',
+    '',
+    ';;1198;;114;;31;;;;;3;4669497.15;100%;Total Terdistribusi'
+  ];
+
+  const csvContent = '\uFEFF' + lines.join('\r\n');
+  downloadBlobAsFile(csvContent, 'TEMPLAT_REKAP_POIN_KINERJA_PELAYANAN.csv');
+};
+
+export const exportRekapKinerjaPelayananToCsv = (
+  unitNama: string,
+  bulan: string,
+  tahun: number,
+  paguJp: number,
+  totalPoin: number,
+  rupiahPerPoin: number,
+  indikator1: string,
+  vol1: number,
+  indikator2: string,
+  vol2: number,
+  indikator3: string,
+  vol3: number,
+  pegawaiRows: Array<{
+    nama: string;
+    prestasi1: number;
+    prestasi2: number;
+    prestasi3: number;
+    poin1: number;
+    poin2: number;
+    poin3: number;
+    jumlahPoin: number;
+    persenPoin: number;
+    jpLangsung: number;
+    subKategori?: string;
+  }>
+) => {
+  const lines = [
+    `# REKAPITULASI POIN KINERJA PELAYANAN RSUD`,
+    `# BULAN: ${bulan.toUpperCase()} ${tahun}`,
+    `# UNIT / INSTALASI: ${unitNama}`,
+    `# PAGU JASA PELAYANAN (Rp): ${paguJp}`,
+    `# TOTAL POIN: ${totalPoin}`,
+    `# RUPIAH PER POIN: ${rupiahPerPoin}`,
+    '',
+    `No;Nama;Prestasi ${indikator1};Total ${indikator1};Prestasi ${indikator2};Total ${indikator2};Prestasi ${indikator3};Total ${indikator3};Poin 1;Poin 2;Poin 3;Jumlah Poin;JP Langsung (Rp.);Persentase;Kategori / Profesi`
+  ];
+
+  pegawaiRows.forEach((p, idx) => {
+    lines.push(
+      `${idx + 1};"${p.nama}";${p.prestasi1};${vol1};${p.prestasi2};${vol2};${p.prestasi3};${vol3};${p.poin1};${p.poin2};${p.poin3};${p.jumlahPoin};${p.jpLangsung};${p.persenPoin}%;"${p.subKategori || ''}"`
+    );
+  });
+
+  const totalJp = pegawaiRows.reduce((acc, p) => acc + p.jpLangsung, 0);
+  lines.push('');
+  lines.push(`;;${vol1};;${vol2};;${vol3};;;;;${totalPoin};${totalJp};100%;Total Terdistribusi`);
+
+  const csvContent = '\uFEFF' + lines.join('\r\n');
+  downloadBlobAsFile(csvContent, `REKAP_KINERJA_${unitNama.toUpperCase()}_${bulan.toUpperCase()}_${tahun}.csv`);
+};
+
+export const downloadBlobAsFile = (content: string, filename: string) => {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -481,4 +616,5 @@ const downloadBlobAsFile = (content: string, filename: string) => {
   link.click();
   document.body.removeChild(link);
 };
+
 

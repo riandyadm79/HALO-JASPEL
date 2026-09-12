@@ -33,6 +33,8 @@ import { exportToXLSX, exportToCSV, exportToTextSummary } from '../utils/exportI
 import { INSTALASI_LAYANAN_LIST } from '../data/initialData';
 import { SlipJaspelModal } from './SlipJaspelModal';
 import { CurrencyInput } from './CurrencyInput';
+import { ConfirmModal } from './ConfirmModal';
+import { DanaDistribusiManager } from './DanaDistribusiManager';
 import { supabase } from '../lib/supabase';
 
 interface AlokasiManagerProps {
@@ -58,6 +60,7 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
 }) => {
   // State
   const [selectedAlokasiId, setSelectedAlokasiId] = useState<string | null>(alokasiList[0]?.id || null);
+  const [alokasiSubTab, setAlokasiSubTab] = useState<'distribusi_dana' | 'daftar_penerima'>('distribusi_dana');
   const [showAddEditModal, setShowAddEditModal] = useState(false);
   const [editingAlokasi, setEditingAlokasi] = useState<AlokasiJaspel | null>(null);
   const [showRecipientModal, setShowRecipientModal] = useState(false);
@@ -79,20 +82,36 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
     }
   }, [selectedCategory]);
 
-  // Form State for Alokasi
+  // Modal konfirmasi custom untuk Alokasi & Penerima
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  // Form State for Alokasi (Nilai Pendapatan diambil 40% sebagai Pagu Jaspel)
   const [formData, setFormData] = useState({
     kodePeriode: '',
-    bulan: 'September',
+    bulan: 'Juli',
     tahun: 2026,
     sumberDana: 'Gabungan Seluruh Layanan' as AlokasiJaspel['sumberDana'],
-    pendapatanKotor: 3800000000,
-    biayaOperasionalRs: 380000000,
-    proporsiJaspelPersen: 42,
-    jasaMedisKlinisPersen: 60,
-    jasaNonKlinisPersen: 30,
-    jasaManajemenPersen: 10,
+    pendapatanKotor: 2859709359,
+    biayaOperasionalRs: 69170318,
+    proporsiJaspelPersen: 40,
+    jasaMedisKlinisPersen: 56.4,
+    jasaNonKlinisPersen: 37.55,
+    jasaManajemenPersen: 6.05,
     status: 'Draft' as AlokasiJaspel['status'],
-    keterangan: ''
+    keterangan: 'Alur penetapan pagu 40% dari pendapatan'
   });
 
   // Form State for Recipient
@@ -141,8 +160,11 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
                           p.unitKerja.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           p.jabatan.toLowerCase().includes(searchQuery.toLowerCase());
       const matchCat = categoryFilter === 'all' || 
-                       p.kategori.toLowerCase() === categoryFilter.toLowerCase() ||
-                       p.unitKerja.toLowerCase().includes(categoryFilter.toLowerCase());
+                       p.kategori.toLowerCase().includes(categoryFilter.toLowerCase()) ||
+                       p.unitKerja.toLowerCase().includes(categoryFilter.toLowerCase()) ||
+                       p.jabatan.toLowerCase().includes(categoryFilter.toLowerCase()) ||
+                       (categoryFilter.toLowerCase().includes('dewan') && (p.jabatan.toLowerCase().includes('dewas') || p.unitKerja.toLowerCase().includes('dewas') || p.kategori.toLowerCase().includes('dewan'))) ||
+                       (categoryFilter.toLowerCase().includes('dewas') && (p.jabatan.toLowerCase().includes('dewas') || p.unitKerja.toLowerCase().includes('dewas') || p.kategori.toLowerCase().includes('dewan')));
       return matchSearch && matchCat;
     });
 
@@ -169,22 +191,22 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
 
   // Handlers for Alokasi CRUD
   const handleOpenAddAlokasi = () => {
-    const nextMonth = 'September';
+    const nextMonth = 'Juli';
     const nextYear = 2026;
     setEditingAlokasi(null);
     setFormData({
-      kodePeriode: `JAPEL-${nextYear}-09`,
+      kodePeriode: `JAPEL-${nextYear}-07`,
       bulan: nextMonth,
       tahun: nextYear,
       sumberDana: 'Gabungan Seluruh Layanan',
-      pendapatanKotor: 3850000000,
-      biayaOperasionalRs: 385000000,
-      proporsiJaspelPersen: 42,
-      jasaMedisKlinisPersen: 60,
-      jasaNonKlinisPersen: 30,
-      jasaManajemenPersen: 10,
+      pendapatanKotor: 2859709359,
+      biayaOperasionalRs: 69170318,
+      proporsiJaspelPersen: 40,
+      jasaMedisKlinisPersen: 56.4,
+      jasaNonKlinisPersen: 37.55,
+      jasaManajemenPersen: 6.05,
       status: 'Draft',
-      keterangan: 'Alokasi Jaspel Bulan September 2026'
+      keterangan: 'Alokasi Jaspel Bulan Juli 2026 (Pagu Jaspel 40% dari Pendapatan)'
     });
     setShowAddEditModal(true);
   };
@@ -274,13 +296,28 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
     }
   };
 
-  const handleDeleteAlokasi = async (id: string) => {
-    if (confirm('Yakin ingin menghapus periode alokasi ini? Seluruh data penerima di dalamnya akan ikut terhapus!')) {
-      await supabase.from('alokasi_jaspel').delete().eq('id', id);
-      setAlokasiList(alokasiList.filter(a => a.id !== id));
-      setPenerimaList(penerimaList.filter(p => p.alokasiId !== id));
-      if (selectedAlokasiId === id) setSelectedAlokasiId(alokasiList[0]?.id || '');
-    }
+  const handleDeleteAlokasi = (id: string, periodeLabel?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Periode Alokasi',
+      message: `Apakah Anda yakin ingin menghapus periode alokasi ${periodeLabel ? `"${periodeLabel}"` : ''}? Seluruh data penerima di dalamnya akan ikut dihapus.`,
+      confirmText: 'Ya, Hapus Periode',
+      cancelText: 'Batal',
+      isDanger: true,
+      onConfirm: async () => {
+        setAlokasiList(prev => prev.filter(a => a.id !== id));
+        setPenerimaList(prev => prev.filter(p => p.alokasiId !== id));
+        if (selectedAlokasiId === id) {
+          setSelectedAlokasiId(alokasiList.find(a => a.id !== id)?.id || '');
+        }
+        try {
+          await supabase.from('penerima_alokasi').delete().eq('alokasi_id', id);
+          await supabase.from('alokasi_jaspel').delete().eq('id', id);
+        } catch (err) {
+          console.error('Error deleting alokasi from supabase:', err);
+        }
+      }
+    });
   };
 
   // Recipient Handlers
@@ -406,24 +443,115 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
     }
   };
 
-  const handleDeleteRecipient = async (id: string) => {
-    if (confirm('Hapus penerima dari alokasi ini?')) {
-      await supabase.from('penerima_alokasi').delete().eq('id', id);
-      setPenerimaList(penerimaList.filter(p => p.id !== id));
+  const handleDeleteRecipient = (id: string, namaPegawai?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Penerima Jaspel',
+      message: `Apakah Anda yakin ingin menghapus data staf ${namaPegawai ? `"${namaPegawai}"` : ''} dari daftar alokasi periode ini?`,
+      confirmText: 'Ya, Hapus Penerima',
+      cancelText: 'Batal',
+      isDanger: true,
+      onConfirm: async () => {
+        setPenerimaList(prev => prev.filter(p => p.id !== id));
+        try {
+          await supabase.from('penerima_alokasi').delete().eq('id', id);
+        } catch (err) {
+          console.error('Error deleting penerima from supabase:', err);
+        }
+      }
+    });
+  };
+
+  const handleStatusChange = async (newStatus: AlokasiJaspel['status']) => {
+    if (!selectedAlokasi) return;
+    const now = new Date().toISOString();
+    try {
+      const { error } = await supabase.from('alokasi_jaspel').update({
+        status: newStatus,
+        tanggal_update: now
+      }).eq('id', selectedAlokasi.id);
+
+      if (error) {
+        console.error('Error updating status in Supabase:', error);
+        alert('Gagal mengubah status: ' + error.message);
+        return;
+      }
+
+      const updated = alokasiList.map(a => 
+        a.id === selectedAlokasi.id ? { ...a, status: newStatus, tanggalUpdate: now } : a
+      );
+      setAlokasiList(updated);
+    } catch (e) {
+      console.error(e);
+      alert('Terjadi kesalahan saat mengubah status alokasi.');
     }
   };
 
-  const handleStatusChange = (newStatus: AlokasiJaspel['status']) => {
-    if (!selectedAlokasi) return;
-    const updated = alokasiList.map(a => 
-      a.id === selectedAlokasi.id ? { ...a, status: newStatus, tanggalUpdate: new Date().toISOString() } : a
-    );
-    setAlokasiList(updated);
+  const handleTogglePayment = async (p: PenerimaAlokasi) => {
+    const newPaidStatus = !p.sudahDibayar;
+    try {
+      await supabase.from('penerima_alokasi').update({ sudah_dibayar: newPaidStatus }).eq('id', p.id);
+      setPenerimaList(penerimaList.map(item => item.id === p.id ? { ...item, sudahDibayar: newPaidStatus } : item));
+    } catch (err) {
+      console.error(err);
+      alert('Gagal memperbarui status pencairan staf');
+    }
+  };
+
+  const handleQuickKoreksi = async (p: PenerimaAlokasi) => {
+    const nextStatus: Record<string, 'Sesuai' | 'Usulan Koreksi' | 'Disetujui Koreksi'> = {
+      'Sesuai': 'Usulan Koreksi',
+      'Usulan Koreksi': 'Disetujui Koreksi',
+      'Disetujui Koreksi': 'Sesuai'
+    };
+    const newKoreksi = nextStatus[p.statusKoreksi || 'Sesuai'] || 'Sesuai';
+    try {
+      await supabase.from('penerima_alokasi').update({ status_koreksi: newKoreksi }).eq('id', p.id);
+      setPenerimaList(penerimaList.map(item => item.id === p.id ? { ...item, statusKoreksi: newKoreksi } : item));
+    } catch (err) {
+      console.error(err);
+      alert('Gagal memperbarui status koreksi');
+    }
   };
 
   return (
     <div className="space-y-6 pb-20 lg:pb-8">
       
+      {/* Sub-tab Navigation: Alur Distribusi Dana (40%) vs Payroll Penerima */}
+      <div className="bg-slate-900/90 rounded-2xl p-1.5 border border-slate-800 flex items-center space-x-2 shadow-lg">
+        <button
+          onClick={() => setAlokasiSubTab('distribusi_dana')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center space-x-2 ${
+            alokasiSubTab === 'distribusi_dana'
+              ? 'bg-amber-400 text-slate-950 shadow-md'
+              : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Sliders className="w-4 h-4" />
+          <span>Alur & Distribusi Pagu Dana (Regulasi 40% CSV)</span>
+        </button>
+        <button
+          onClick={() => setAlokasiSubTab('daftar_penerima')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center space-x-2 ${
+            alokasiSubTab === 'daftar_penerima'
+              ? 'bg-amber-400 text-slate-950 shadow-md'
+              : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Daftar Payroll & Rincian Penerima Jaspel</span>
+        </button>
+      </div>
+
+      {alokasiSubTab === 'distribusi_dana' ? (
+        <DanaDistribusiManager
+          alokasiList={alokasiList}
+          setAlokasiList={setAlokasiList}
+          currentUser={currentUser}
+          onNavigateToPayroll={() => setAlokasiSubTab('daftar_penerima')}
+        />
+      ) : (
+        <>
       {/* Top Banner Metric Overview */}
       <div className="bg-gradient-to-r from-[#172554] via-[#0f1d38] to-[#1e3a8a] rounded-3xl p-5 sm:p-7 border border-blue-700/50 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-amber-400/5 rounded-full blur-3xl pointer-events-none" />
@@ -620,7 +748,7 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
 
               {role === 'superadmin' && (
                 <button
-                  onClick={() => handleDeleteAlokasi(selectedAlokasi.id)}
+                  onClick={() => handleDeleteAlokasi(selectedAlokasi.id, `${selectedAlokasi.bulan} ${selectedAlokasi.tahun}`)}
                   className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-rose-400 text-xs font-semibold"
                   title="Hapus Periode Ini"
                 >
@@ -681,23 +809,34 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
               <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
                 <tr>
                   <th className="py-3.5 px-4">Nama & Unit</th>
-                  <th className="py-3.5 px-3 text-center">Poin Dasar</th>
-                  <th className="py-3.5 px-3 text-center">Kompetensi</th>
-                  <th className="py-3.5 px-3 text-center">Risiko</th>
-                  <th className="py-3.5 px-3 text-center">Kinerja</th>
-                  <th className="py-3.5 px-3 text-center font-extrabold text-amber-300">Total Poin</th>
-                  <th className="py-3.5 px-4 text-right">Bruto Jaspel</th>
+                  <th className="py-3.5 px-3 text-center">Skor Total</th>
+                  <th className="py-3.5 px-3 text-right">Post Remunerasi</th>
+                  <th className="py-3.5 px-3 text-right">Beban Kerja</th>
+                  <th className="py-3.5 px-4 text-right font-extrabold text-amber-300">Bruto Total</th>
                   <th className="py-3.5 px-3 text-right">PPh 21</th>
                   <th className="py-3.5 px-4 text-right font-bold text-white">Netto Diterima</th>
+                  <th className="py-3.5 px-3 text-center">Adm %</th>
                   <th className="py-3.5 px-3 text-center">Koreksi</th>
+                  <th className="py-3.5 px-3 text-center">Pencairan</th>
                   <th className="py-3.5 px-3 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-200">
                 {paginatedRecipients.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-12 text-center text-slate-500 font-medium">
-                      Tidak ada data staf penerima yang cocok dengan filter.
+                    <td colSpan={11} className="py-16 text-center text-slate-400">
+                      <div className="max-w-md mx-auto space-y-2">
+                        <p className="font-semibold text-slate-300 text-sm">
+                          {penerimaList.length === 0
+                            ? 'Belum ada data penerima yang diunggah di Supabase'
+                            : 'Tidak ada staf penerima yang cocok dengan filter pencarian'}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {penerimaList.length === 0
+                            ? 'Tabel penerima murni kosong sesuai data asli. Anda dapat mengunggah file data penerima melalui menu "Export / Import" atau menambahkannya secara manual.'
+                            : 'Coba ubah kata kunci pencarian atau kategori unit di atas.'}
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -707,14 +846,16 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
                         <div className="font-bold text-white text-xs sm:text-sm">{p.nama}</div>
                         <div className="text-[10px] text-slate-400">{p.unitKerja} • {p.jabatan}</div>
                       </td>
-                      <td className="py-3 px-3 text-center font-mono text-slate-300">{p.poinDasar}</td>
-                      <td className="py-3 px-3 text-center font-mono text-slate-300">{p.poinKompetensi}</td>
-                      <td className="py-3 px-3 text-center font-mono text-slate-300">{p.poinRisiko}</td>
-                      <td className="py-3 px-3 text-center font-mono text-slate-300">{p.poinKinerja}</td>
-                      <td className="py-3 px-3 text-center font-mono font-black text-amber-400 text-xs sm:text-sm">
+                      <td className="py-3 px-3 text-center font-mono font-bold text-amber-400">
                         {p.totalPoin}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-300">
+                      <td className="py-3 px-3 text-right font-mono text-slate-300">
+                        {formatRupiah(p.jaspelPostRemunerasi || 0)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-slate-300">
+                        {formatRupiah(p.postPenyesuaianBebanKerja || 0)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-amber-400">
                         {formatRupiah(p.brutoJaspel)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-rose-400">
@@ -724,13 +865,34 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
                         {formatRupiah(p.nettoDiterima)}
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          p.statusKoreksi === 'Sesuai' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
-                          p.statusKoreksi === 'Usulan Koreksi' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
-                          'bg-blue-950 text-blue-300 border border-blue-800'
-                        }`}>
+                        <span className="font-mono text-emerald-400 font-semibold">{p.persenAdministrasi || '0,00%'}</span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <button
+                          onClick={() => handleQuickKoreksi(p)}
+                          title="Klik untuk rotasi status koreksi: Sesuai -> Usulan Koreksi -> Disetujui Koreksi"
+                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold transition hover:scale-105 cursor-pointer ${
+                            p.statusKoreksi === 'Sesuai' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                            p.statusKoreksi === 'Usulan Koreksi' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                            'bg-blue-950 text-blue-300 border border-blue-800'
+                          }`}
+                        >
                           {p.statusKoreksi}
-                        </span>
+                        </button>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <button
+                          onClick={() => handleTogglePayment(p)}
+                          title="Klik untuk mengubah status pencairan payroll"
+                          className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition cursor-pointer ${
+                            p.sudahDibayar 
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900' 
+                              : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-white'
+                          }`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${p.sudahDibayar ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                          <span>{p.sudahDibayar ? 'Lunas' : 'Tertunda'}</span>
+                        </button>
                       </td>
                       <td className="py-3 px-3 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center space-x-1">
@@ -754,7 +916,7 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
 
                           {canManageAlokasi && (
                             <button
-                              onClick={() => handleDeleteRecipient(p.id)}
+                              onClick={() => handleDeleteRecipient(p.id, p.nama)}
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400"
                               title="Hapus"
                             >
@@ -831,6 +993,8 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
           </div>
 
         </div>
+      )}
+      </>
       )}
 
       {/* MODAL 1: ADD / EDIT ALOKASI */}
@@ -937,14 +1101,12 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <CurrencyInput
-                  label="Pendapatan Kotor RS (Rp)"
                   required
                   value={formData.pendapatanKotor}
                   onChange={val => setFormData({ ...formData, pendapatanKotor: val })}
                   placeholder="3850000000"
                 />
                 <CurrencyInput
-                  label="Biaya Operasional Beban (Rp)"
                   value={formData.biayaOperasionalRs}
                   onChange={val => setFormData({ ...formData, biayaOperasionalRs: val })}
                   placeholder="385000000"
@@ -1200,6 +1362,18 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
           onClose={() => setSelectedSlipRecipient(null)}
         />
       )}
+
+      {/* MODAL KONFIRMASI (Aman iframe) */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        isDanger={confirmModal.isDanger !== false}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
 
     </div>
   );

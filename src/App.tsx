@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  INITIAL_USERS, 
-  INITIAL_ALOKASI, 
-  INITIAL_PENERIMA, 
-  INITIAL_GENERAL_INDEX, 
-  INITIAL_COST_CENTER, 
-  INITIAL_REVENUE_CENTER, 
-  INITIAL_INDEKS_JASA_LANGSUNG,
   DEFAULT_INDEKS_JASA_HEADER_CONFIG,
   INITIAL_PERMISSIONS, 
-  INITIAL_STORAGE_FILES 
+  INITIAL_STORAGE_FILES,
+  INITIAL_ALOKASI,
+  INITIAL_PENERIMA,
+  INITIAL_GENERAL_INDEX,
+  INITIAL_COST_CENTER,
+  INITIAL_REVENUE_CENTER,
+  INITIAL_INDEKS_JASA_LANGSUNG,
+  INITIAL_USERS
 } from './data/initialData';
 import { 
   User, 
@@ -22,7 +22,9 @@ import {
   IndeksJasaHeaderConfig,
   Permission, 
   SupabaseConfig, 
-  BucketStorageFile 
+  BucketStorageFile,
+  HospitalProfile, 
+  DEFAULT_HOSPITAL_PROFILE
 } from './types';
 import { INITIAL_SUPABASE_CONFIG } from './config/supabase_config';
 
@@ -32,21 +34,26 @@ import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
 import { AlokasiManager } from './components/AlokasiManager';
 import { DatabaseManager } from './components/DatabaseManager';
+import { IndeksJasaLangsungManager } from './components/IndeksJasaLangsungManager';
 import { RbacMatrixManager } from './components/RbacMatrixManager';
-import { SupabaseSyncManager } from './components/SupabaseSyncManager';
 import { ExportImportCenter } from './components/ExportImportCenter';
 import { SimulasiKalkulator } from './components/SimulasiKalkulator';
 import { SlipJaspelModal } from './components/SlipJaspelModal';
 import { VisualisasiDashboard } from './components/VisualisasiDashboard';
+import { SupabaseSyncManager } from './components/SupabaseSyncManager';
 import { RekapCetakManager } from './components/RekapCetakManager';
-import { ChangePasswordModal } from './components/ChangePasswordModal';
-import { HospitalProfileModal, HospitalProfile, DEFAULT_HOSPITAL_PROFILE } from './components/HospitalProfileModal';
-import { LandingPage } from './components/LandingPage';
 import { Login } from './components/Login';
 import { supabase } from './lib/supabase';
-import { seedDatabase } from './data/seedDatabase';
-import { pushAllDataToSupabase, pullAllDataFromSupabase, testSupabaseConnection } from './lib/syncService';
 import { formatRupiah } from './utils/calculations';
+import { 
+  mapAlokasiFromSupabase, 
+  mapPenerimaFromSupabase, 
+  mapGeneralIndexFromSupabase, 
+  mapCostCenterFromSupabase, 
+  mapRevenueCenterFromSupabase, 
+  mapUserFromSupabase, 
+  mapHospitalProfileFromSupabase 
+} from './utils/supabaseMapper';
 import { FileText, Sparkles, Check, Download, AlertCircle, Info, Edit3, X, Loader2 } from 'lucide-react';
 
 export function App() {
@@ -54,191 +61,50 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // View state: 'landing' (public portal), 'login' (auth screen), 'app' (authenticated dashboard)
-  const [viewMode, setViewMode] = useState<'landing' | 'login' | 'app'>('landing');
+  // View state: 'login' (auth screen), 'app' (authenticated dashboard)
+  const [viewMode, setViewMode] = useState<'login' | 'app'>('login');
 
-  // 1. User & Persona State
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('halo_japel_users_list');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return INITIAL_USERS;
-  });
+  // 1. User State (Strictly from Supabase with fallback)
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
 
   // 2. Navigation State
-  const [activeTab, setActiveTab] = useState<string>('rekap_cetak');
+  const [activeTab, setActiveTab] = useState<string>('indeks_jasa');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [dbSubTab, setDbSubTab] = useState<'general' | 'cost' | 'revenue' | 'indeks_jasa'>('general');
+  const [dbSubTab, setDbSubTab] = useState<'general' | 'cost' | 'revenue' | 'indeks_jasa'>('indeks_jasa');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // 3. Alokasi & Penerima State
-  const [alokasiList, setAlokasiList] = useState<AlokasiJaspel[]>(() => {
-    const saved = localStorage.getItem('halo_japel_alokasi_list');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return INITIAL_ALOKASI;
-  });
-  const [penerimaList, setPenerimaList] = useState<PenerimaAlokasi[]>(() => {
-    const saved = localStorage.getItem('halo_japel_penerima_list');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.some(p => p.id === 'pen-1' || p.nama?.includes('Satria Pratama') || p.nama?.includes('Ratna Kartika'))) {
-          localStorage.removeItem('halo_japel_penerima_list');
-          return [];
-        }
-        return parsed;
-      } catch (e) {}
-    }
-    return INITIAL_PENERIMA;
-  });
+  // 3. Alokasi & Penerima State (Strictly from Supabase with fallback)
+  const [alokasiList, setAlokasiList] = useState<AlokasiJaspel[]>(INITIAL_ALOKASI);
+  const [penerimaList, setPenerimaList] = useState<PenerimaAlokasi[]>(INITIAL_PENERIMA);
 
-  // 4. Database Master State
-  const [generalIndexList, setGeneralIndexList] = useState<GeneralIndexItem[]>(() => {
-    const saved = localStorage.getItem('halo_japel_genidx_list');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 50) {
-          return parsed;
-        }
-      } catch (e) {}
-    }
-    return INITIAL_GENERAL_INDEX;
-  });
-  const [costCenterList, setCostCenterList] = useState<CostCenterItem[]>(() => {
-    const saved = localStorage.getItem('halo_japel_cost_list');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return INITIAL_COST_CENTER;
-  });
-  const [revenueCenterList, setRevenueCenterList] = useState<RevenueCenterItem[]>(() => {
-    const saved = localStorage.getItem('halo_japel_rev_list');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return INITIAL_REVENUE_CENTER;
-  });
-
+  // 4. Database Master State (Strictly from Supabase with fallback)
+  const [generalIndexList, setGeneralIndexList] = useState<GeneralIndexItem[]>(INITIAL_GENERAL_INDEX);
+  const [costCenterList, setCostCenterList] = useState<CostCenterItem[]>(INITIAL_COST_CENTER);
+  const [revenueCenterList, setRevenueCenterList] = useState<RevenueCenterItem[]>(INITIAL_REVENUE_CENTER);
   const [indeksJasaList, setIndeksJasaList] = useState<IndeksJasaLangsungItem[]>(() => {
-    const saved = localStorage.getItem('halo_japel_indeks_jasa_list');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    try {
+      const saved = localStorage.getItem('halo_jaspel_indeks_jasa');
+      return saved ? JSON.parse(saved) : INITIAL_INDEKS_JASA_LANGSUNG;
+    } catch {
+      return INITIAL_INDEKS_JASA_LANGSUNG;
     }
-    return INITIAL_INDEKS_JASA_LANGSUNG;
   });
-
   const [indeksJasaHeaderConfig, setIndeksJasaHeaderConfig] = useState<IndeksJasaHeaderConfig>(() => {
-    const saved = localStorage.getItem('halo_japel_indeks_jasa_hdr_cfg');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    try {
+      const saved = localStorage.getItem('halo_jaspel_indeks_jasa_header_config');
+      return saved ? JSON.parse(saved) : DEFAULT_INDEKS_JASA_HEADER_CONFIG;
+    } catch {
+      return DEFAULT_INDEKS_JASA_HEADER_CONFIG;
     }
-    return DEFAULT_INDEKS_JASA_HEADER_CONFIG;
   });
 
-  // 5. Hospital Profile State
-  const [hospitalProfile, setHospitalProfile] = useState<HospitalProfile>(() => {
-    const saved = localStorage.getItem('halo_japel_hospital_profile');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return DEFAULT_HOSPITAL_PROFILE;
-  });
+  // 5. Hospital Profile State (Strictly from Supabase)
+  const [hospitalProfile, setHospitalProfile] = useState<HospitalProfile>(DEFAULT_HOSPITAL_PROFILE);
 
-  // Automatically keep localStorage in sync with user edits
-  useEffect(() => {
-    localStorage.setItem('halo_japel_alokasi_list', JSON.stringify(alokasiList));
-  }, [alokasiList]);
-
-  useEffect(() => {
-    localStorage.setItem('halo_japel_penerima_list', JSON.stringify(penerimaList));
-  }, [penerimaList]);
-
-  useEffect(() => {
-    localStorage.setItem('halo_japel_genidx_list', JSON.stringify(generalIndexList));
-  }, [generalIndexList]);
-
-  useEffect(() => {
-    localStorage.setItem('halo_japel_cost_list', JSON.stringify(costCenterList));
-  }, [costCenterList]);
-
-  useEffect(() => {
-    localStorage.setItem('halo_japel_rev_list', JSON.stringify(revenueCenterList));
-  }, [revenueCenterList]);
-
-  useEffect(() => {
-    localStorage.setItem('halo_japel_indeks_jasa_list', JSON.stringify(indeksJasaList));
-  }, [indeksJasaList]);
-
-  useEffect(() => {
-    localStorage.setItem('halo_japel_indeks_jasa_hdr_cfg', JSON.stringify(indeksJasaHeaderConfig));
-  }, [indeksJasaHeaderConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('halo_japel_users_list', JSON.stringify(users));
-  }, [users]);
-
-  useEffect(() => {
-    localStorage.setItem('halo_japel_hospital_profile', JSON.stringify(hospitalProfile));
-  }, [hospitalProfile]);
-
-  // Auto-check Supabase Connection on initial app load
-  useEffect(() => {
-    const checkInitialConnection = async () => {
-      try {
-        const diag = await testSupabaseConnection();
-        setSupabaseConfig(prev => ({
-          ...prev,
-          connected: diag.connected,
-          latency: diag.latencyMs,
-          lastCheckedDate: new Date().toISOString()
-        }));
-      } catch (err) {
-        console.warn('Initial Supabase connection check error:', err);
-      }
-    };
-    checkInitialConnection();
-  }, []);
-
-  // Auto-push to Supabase whenever changes are made & saved
-  const isInitialMount = React.useRef(true);
-  const isFetchingRef = React.useRef(false);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    if (isFetchingRef.current) {
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        await pushAllDataToSupabase({
-          alokasiList,
-          penerimaList,
-          generalIndexList,
-          costCenterList,
-          revenueCenterList,
-          indeksJasaList,
-          users,
-          hospitalProfile
-        });
-      } catch (err) {
-        console.warn('Background auto-push notice:', err);
-      }
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [alokasiList, penerimaList, generalIndexList, costCenterList, revenueCenterList, indeksJasaList, users, hospitalProfile]);
-
-  // 5. RBAC & Permissions State
+  // 6. RBAC & Permissions State
   const [permissions, setPermissions] = useState<Permission[]>(INITIAL_PERMISSIONS);
 
-  // 6. Supabase & Bucket Storage State
+  // 7. Supabase & Bucket Storage State
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(() => {
     const envConfig = typeof window !== 'undefined' && (window as any).ENV;
     if (envConfig && envConfig.SUPABASE_URL) {
@@ -254,16 +120,27 @@ export function App() {
 
   const [storageFiles, setStorageFiles] = useState<BucketStorageFile[]>(INITIAL_STORAGE_FILES);
 
-  // 7. Modals / Notifications
+  // 8. Modals / Notifications
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [stafSlipOpen, setStafSlipOpen] = useState(false);
-  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
-  const [showHospitalProfileModal, setShowHospitalProfileModal] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
 
-  // 8. Announcement
+  // 9. Announcement
   const [announcement, setAnnouncement] = useState({ message: '', isVisible: false, type: 'info' });
   const [showAnnouncementEdit, setShowAnnouncementEdit] = useState(false);
+
+  // Clear any legacy mock localStorage on mount to ensure ONLY Supabase is used
+  useEffect(() => {
+    try {
+      localStorage.removeItem('halo_japel_alokasi_list');
+      localStorage.removeItem('halo_japel_penerima_list');
+      localStorage.removeItem('halo_japel_genidx_list');
+      localStorage.removeItem('halo_japel_cost_list');
+      localStorage.removeItem('halo_japel_rev_list');
+      localStorage.removeItem('halo_japel_users_list');
+    } catch (e) {
+      // ignore
+    }
+  }, []);
 
   // Auth & Data Fetching
   useEffect(() => {
@@ -281,51 +158,56 @@ export function App() {
       if (session) {
         setViewMode('app');
       } else if (!currentUser) {
-        setViewMode('landing');
+        setViewMode('login');
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [currentUser]);
 
+  // STRICT FETCH FROM SUPABASE ONLY
   const fetchData = async () => {
-    isFetchingRef.current = true;
     setIsLoading(true);
     try {
-      const res = await pullAllDataFromSupabase();
-      if (res.success && res.data) {
-        if (res.data.alokasiList && res.data.alokasiList.length > 0) {
-          setAlokasiList(res.data.alokasiList);
-        }
-        if (res.data.penerimaList && res.data.penerimaList.length > 0) {
-          setPenerimaList(res.data.penerimaList);
-        }
-        if (res.data.generalIndexList && res.data.generalIndexList.length > 0) {
-          setGeneralIndexList(res.data.generalIndexList);
-        }
-        if (res.data.costCenterList && res.data.costCenterList.length > 0) {
-          setCostCenterList(res.data.costCenterList);
-        }
-        if (res.data.revenueCenterList && res.data.revenueCenterList.length > 0) {
-          setRevenueCenterList(res.data.revenueCenterList);
-        }
-        if (res.data.indeksJasaList && res.data.indeksJasaList.length > 0) {
-          setIndeksJasaList(res.data.indeksJasaList);
-        }
-        if (res.data.users && res.data.users.length > 0) {
-          setUsers(res.data.users);
-        }
-        if (res.data.hospitalProfile) {
-          setHospitalProfile(res.data.hospitalProfile);
-        }
+      const [
+        { data: alokasi, error: errAlo },
+        { data: penerima, error: errPen },
+        { data: genIdx, error: errGen },
+        { data: cost, error: errCost },
+        { data: revenue, error: errRev },
+        { data: usr, error: errUsr },
+        { data: prof, error: errProf }
+      ] = await Promise.all([
+        supabase.from('alokasi_jaspel').select('*').order('tahun', { ascending: false }).order('id', { ascending: true }),
+        supabase.from('penerima_alokasi').select('*'),
+        supabase.from('general_index').select('*'),
+        supabase.from('cost_center').select('*'),
+        supabase.from('revenue_center').select('*'),
+        supabase.from('users_rbac').select('*'),
+        supabase.from('hospital_profile').select('*').maybeSingle()
+      ]);
+
+      if (errAlo) console.warn('Alokasi query:', errAlo.message);
+      if (errPen) console.warn('Penerima query:', errPen.message);
+      if (errGen) console.warn('General index query:', errGen.message);
+      if (errCost) console.warn('Cost center query:', errCost.message);
+      if (errRev) console.warn('Revenue center query:', errRev.message);
+      if (errUsr) console.warn('Users query:', errUsr.message);
+
+      // Populate states from Supabase with resilient authentic fallback
+      setAlokasiList(alokasi && alokasi.length > 0 ? alokasi.map(mapAlokasiFromSupabase) : INITIAL_ALOKASI);
+      setPenerimaList(penerima && penerima.length > 0 ? penerima.map(mapPenerimaFromSupabase) : INITIAL_PENERIMA);
+      setGeneralIndexList(genIdx && genIdx.length > 0 ? genIdx.map(mapGeneralIndexFromSupabase) : INITIAL_GENERAL_INDEX);
+      setCostCenterList(cost && cost.length > 0 ? cost.map(mapCostCenterFromSupabase) : INITIAL_COST_CENTER);
+      setRevenueCenterList(revenue && revenue.length > 0 ? revenue.map(mapRevenueCenterFromSupabase) : INITIAL_REVENUE_CENTER);
+      setUsers(usr && usr.length > 0 ? usr.map(mapUserFromSupabase) : INITIAL_USERS);
+      if (prof) {
+        setHospitalProfile(mapHospitalProfileFromSupabase(prof));
       }
     } catch (error) {
       console.error('Error fetching data from Supabase:', error);
     } finally {
       setIsLoading(false);
-      setTimeout(() => {
-        isFetchingRef.current = false;
-      }, 1000);
     }
   };
 
@@ -333,111 +215,35 @@ export function App() {
     fetchData();
   }, [session]);
 
-  const handleSeedDatabase = async () => {
-    setIsSeeding(true);
-    const result = await seedDatabase();
-    if (result.success) {
-      showToast('Berhasil melakukan sinkronisasi & push data ke Supabase Cloud!');
-      await fetchData();
-    } else {
-      showToast('Gagal sinkronisasi: ' + (result.error as Error).message);
-    }
-    setIsSeeding(false);
-  };
-
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Push Trigger Handler - Push CURRENT app state to Supabase Cloud
-  const handlePushCloud = async () => {
-    setIsLoading(true);
-    try {
-      const res = await pushAllDataToSupabase({
-        alokasiList,
-        penerimaList,
-        generalIndexList,
-        costCenterList,
-        revenueCenterList,
-        indeksJasaList,
-        users,
-        hospitalProfile
-      });
-      if (res.success) {
-        showToast(res.message);
-        setSupabaseConfig(prev => ({
-          ...prev,
-          lastPushDate: new Date().toISOString()
-        }));
-      } else {
-        showToast(res.message);
-      }
-    } catch (e: any) {
-      showToast('Gagal Push: ' + e.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Pull Trigger Handler - Pull real data from Supabase Cloud
-  const handlePullCloud = async () => {
-    setIsLoading(true);
-    try {
-      const res = await pullAllDataFromSupabase();
-      if (res.success && res.data) {
-        if (res.data.alokasiList && res.data.alokasiList.length > 0) {
-          setAlokasiList(res.data.alokasiList);
-        }
-        if (res.data.penerimaList && res.data.penerimaList.length > 0) {
-          setPenerimaList(res.data.penerimaList);
-        }
-        if (res.data.generalIndexList && res.data.generalIndexList.length > 0) {
-          setGeneralIndexList(res.data.generalIndexList);
-        }
-        if (res.data.costCenterList && res.data.costCenterList.length > 0) {
-          setCostCenterList(res.data.costCenterList);
-        }
-        if (res.data.revenueCenterList && res.data.revenueCenterList.length > 0) {
-          setRevenueCenterList(res.data.revenueCenterList);
-        }
-        if (res.data.indeksJasaList && res.data.indeksJasaList.length > 0) {
-          setIndeksJasaList(res.data.indeksJasaList);
-        }
-        if (res.data.users && res.data.users.length > 0) {
-          setUsers(res.data.users);
-        }
-        if (res.data.hospitalProfile) {
-          setHospitalProfile(res.data.hospitalProfile);
-        }
-        setSupabaseConfig(prev => ({
-          ...prev,
-          lastPullDate: new Date().toISOString()
-        }));
-        showToast(res.message);
-      } else {
-        showToast(res.message);
-      }
-    } catch (e: any) {
-      showToast('Gagal Pull: ' + e.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Apply simulated pagu to first active alokasi draft
-  const handleApplySimulation = (paguBaru: number, nilaiPoinBaru: number) => {
+  const handleApplySimulation = async (paguBaru: number, _nilaiPoinBaru: number) => {
     if (alokasiList.length > 0) {
+      const targetAlokasi = alokasiList[0];
+      try {
+        await supabase.from('alokasi_jaspel').update({
+          pagu_jaspel_netto: paguBaru,
+          tanggal_update: new Date().toISOString()
+        }).eq('id', targetAlokasi.id);
+      } catch (e) {
+        console.warn('Simulation update warning:', e);
+      }
+
       setAlokasiList(alokasiList.map((a, idx) => {
         if (idx === 0) {
           return {
             ...a,
-            paguJaspelNetto: paguBaru
+            paguJaspelNetto: paguBaru,
+            tanggalUpdate: new Date().toISOString()
           };
         }
         return a;
       }));
-      showToast(`Pagu simulasi ${formatRupiah(paguBaru)} diterapkan ke draft alokasi!`);
+      showToast(`Pagu simulasi ${formatRupiah(paguBaru)} berhasil disimpan ke draft alokasi Supabase!`);
       setActiveTab('alokasi');
     }
   };
@@ -458,37 +264,23 @@ export function App() {
     }
     setSession(null);
     setCurrentUser(null);
-    setViewMode('landing');
-    showToast('Anda telah keluar dari sistem secara aman.');
+    setViewMode('login');
+    showToast('Anda telah keluar dari sistem.');
   };
 
-  // Loading Screen
-  if (isLoading && !alokasiList.length) {
+  // Loading Screen (Initial Boot)
+  if (isLoading && !alokasiList.length && !users.length) {
     return (
       <div className="min-h-screen bg-[#07090e] flex flex-col items-center justify-center space-y-4 text-white">
         <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
         <p className="text-sm font-bold text-slate-300 animate-pulse">
-          Menghubungkan ke Database Supabase Cloud RSUD...
+          Memuat data langsung dari Supabase Cloud...
         </p>
       </div>
     );
   }
 
-  // 1. VIEW MODE: LANDING PAGE (Shown before login, contains Visualisasi Dashboard)
-  if (viewMode === 'landing') {
-    return (
-      <LandingPage
-        onGoToLogin={() => setViewMode('login')}
-        alokasiList={alokasiList}
-        costCenterList={costCenterList}
-        revenueCenterList={revenueCenterList}
-        penerimaList={penerimaList}
-        hospitalProfile={hospitalProfile}
-      />
-    );
-  }
-
-  // 2. VIEW MODE: LOGIN SCREEN
+  // 1. VIEW MODE: LOGIN SCREEN
   if (viewMode === 'login' || (!currentUser && !session)) {
     return (
       <Login 
@@ -497,13 +289,11 @@ export function App() {
           setViewMode('app');
           showToast(`Berhasil masuk sebagai ${user.nama} (${user.role.toUpperCase()})`);
         }} 
-        onBackToLanding={() => setViewMode('landing')}
-        hospitalProfile={hospitalProfile}
       />
     );
   }
 
-  // 3. VIEW MODE: AUTHENTICATED DASHBOARD APPLICATION
+  // 2. VIEW MODE: AUTHENTICATED DASHBOARD APPLICATION
   const effectiveUser = currentUser || {
     id: session?.user?.id || 'usr-default',
     nama: session?.user?.email?.split('@')[0] || 'Super Administrator',
@@ -515,25 +305,16 @@ export function App() {
   return (
     <div className="app-root min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-amber-400 selection:text-slate-950 transition-colors duration-200">
       
-      {/* 1. Global Navigation Bar */}
+      {/* Global Navigation Bar */}
       <Navbar
         currentUser={effectiveUser}
-        users={users}
-        onSelectUser={(user) => {
-          setCurrentUser(user);
-          showToast(`Beralih ke peran: ${user.nama} (${(user.role || 'staf').toUpperCase()})`);
-        }}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         rlsEnabled={supabaseConfig.rlsEnabled}
         onOpenSyncModal={() => setActiveTab('supabase')}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         isMobileMenuOpen={isMobileMenuOpen}
-        onOpenChangePassword={() => setShowChangePasswordModal(true)}
         onLogout={handleLogout}
-        onGoToLanding={() => setViewMode('landing')}
-        hospitalProfile={hospitalProfile}
-        onOpenHospitalProfile={() => setShowHospitalProfileModal(true)}
       />
 
       {/* System Announcement Banner */}
@@ -546,7 +327,7 @@ export function App() {
           <div className="flex items-center space-x-2">
             {announcement.type === 'warning' ? <AlertCircle className="w-4 h-4 shrink-0" /> : <Info className="w-4 h-4 shrink-0" />}
             <span className="font-medium">
-              {announcement.message || (effectiveUser?.role === 'superadmin' ? 'Pengumuman Sistem RSUD (Admin Only View).' : '')}
+              {announcement.message || (effectiveUser?.role === 'superadmin' ? 'Pengumuman Sistem BLUD (Admin Only View).' : '')}
             </span>
           </div>
           {effectiveUser?.role === 'superadmin' && (
@@ -564,7 +345,7 @@ export function App() {
       {/* Main Responsive Body (Sidebar + Content Canvas) */}
       <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
         
-        {/* 2. Desktop Persistent Sidebar */}
+        {/* Desktop Persistent Sidebar */}
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -575,11 +356,9 @@ export function App() {
           setSelectedCategory={setSelectedCategory}
           dbSubTab={dbSubTab}
           setDbSubTab={setDbSubTab}
-          hospitalProfile={hospitalProfile}
-          onOpenHospitalProfile={() => setShowHospitalProfileModal(true)}
         />
 
-        {/* 3. Main Workspace Area */}
+        {/* Main Workspace Area */}
         <main className="flex-1 p-3 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden">
           
           {/* Active Persona Banner for Staff */}
@@ -588,13 +367,12 @@ export function App() {
               <div>
                 <span className="text-[10px] font-black uppercase text-amber-400">Mode Transparansi Staf</span>
                 <h3 className="text-sm sm:text-base font-bold text-white">
-                  Selamat datang, {effectiveUser?.nama || 'Pengguna'}!
+                  Selamat datang, {effectiveUser?.nama || 'Pegawai RSUD'}. Anda memiliki akses transparansi jaspel pribadi.
                 </h3>
-                <p className="text-xs text-slate-300">
-                  Sebagai Staf/Penerima, Anda memiliki akses penuh melihat transparansi slip jaspel pribadi Anda.
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Unit: <span className="text-amber-300 font-semibold">{effectiveUser?.unit || 'Staf Rumah Sakit'}</span> • Jabatan: {effectiveUser?.jabatan || 'Fungsional Medis'}
                 </p>
               </div>
-
               <button
                 onClick={() => setStafSlipOpen(true)}
                 className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition flex items-center space-x-2 shrink-0 self-start sm:self-auto"
@@ -605,21 +383,7 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 0: REKAP PENERIMAAN & CETAK SEMUA TABEL */}
-          {activeTab === 'rekap_cetak' && (
-            <RekapCetakManager
-              alokasiList={alokasiList}
-              penerimaList={penerimaList}
-              generalIndexList={generalIndexList}
-              costCenterList={costCenterList}
-              revenueCenterList={revenueCenterList}
-              currentUser={effectiveUser}
-              permissions={permissions}
-              hospitalProfile={hospitalProfile}
-            />
-          )}
-
-          {/* TAB 1: ALOKASI JASPEL (CRUD, Rekap, Rincian, Status Workflow) */}
+          {/* TAB 1: ALOKASI JASPEL */}
           {activeTab === 'alokasi' && (
             <AlokasiManager
               alokasiList={alokasiList}
@@ -633,7 +397,7 @@ export function App() {
             />
           )}
 
-          {/* TAB 2: DATABASE MANAJER (General Index, Cost Center, Revenue Center, Indeks Jasa) */}
+          {/* TAB 2: DATABASE MASTER */}
           {activeTab === 'database' && (
             <DatabaseManager
               generalIndexList={generalIndexList}
@@ -652,7 +416,7 @@ export function App() {
             />
           )}
 
-          {/* TAB 3: MATRIX RBAC & PENGGUNA */}
+          {/* TAB 3: MATRIX RBAC */}
           {activeTab === 'rbac' && (
             <RbacMatrixManager
               users={users}
@@ -660,33 +424,16 @@ export function App() {
               permissions={permissions}
               setPermissions={setPermissions}
               currentUser={effectiveUser}
-              onSelectUser={(u) => {
-                setCurrentUser(u);
-                showToast(`Beralih ke persona: ${u.nama} (${u.role.toUpperCase()})`);
-              }}
             />
           )}
 
-          {/* TAB 4: SUPABASE RLS, PUSH/PULL & STORAGE BUCKET */}
-          {activeTab === 'supabase' && (
-            <SupabaseSyncManager
-              supabaseConfig={supabaseConfig}
-              setSupabaseConfig={setSupabaseConfig}
-              storageFiles={storageFiles}
-              setStorageFiles={setStorageFiles}
-              currentUser={effectiveUser}
-              onTriggerPush={handlePushCloud}
-              onTriggerPull={handlePullCloud}
-              onSeed={handleSeedDatabase}
-              isSeeding={isSeeding}
+          {/* TAB 4: REKAP & CETAK (Official BLUD Distribution Document) */}
+          {activeTab === 'rekap_cetak' && (
+            <RekapCetakManager
               alokasiList={alokasiList}
               penerimaList={penerimaList}
-              generalIndexList={generalIndexList}
-              costCenterList={costCenterList}
-              revenueCenterList={revenueCenterList}
-              indeksJasaList={indeksJasaList}
-              users={users}
               hospitalProfile={hospitalProfile}
+              currentUser={effectiveUser}
             />
           )}
 
@@ -723,10 +470,26 @@ export function App() {
             />
           )}
 
+          {/* TAB 8: SUPABASE & STORAGE RLS */}
+          {activeTab === 'supabase' && (
+            <SupabaseSyncManager
+              onRefreshData={fetchData}
+            />
+          )}
+
+          {/* TAB 9: PANEL INSTALASI & LAYANAN (INDEKS JASA LANGSUNG) */}
+          {(activeTab === 'indeks_jasa' || activeTab === 'instalasi_layanan') && (
+            <IndeksJasaLangsungManager
+              currentUser={effectiveUser}
+              initialSelectedUnit={selectedCategory}
+              onNavigateToPayroll={() => setActiveTab('alokasi')}
+            />
+          )}
+
         </main>
       </div>
 
-      {/* 4. Mobile Bottom Navigation & Slide Drawer */}
+      {/* Mobile Bottom Navigation & Slide Drawer */}
       <MobileNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -738,7 +501,7 @@ export function App() {
         setSelectedCategory={setSelectedCategory}
       />
 
-      {/* 5. Staf Remuneration Slip Modal */}
+      {/* Staf Remuneration Slip Modal */}
       {stafSlipOpen && activeAlokasi && myPenerimaRecord && (
         <SlipJaspelModal
           penerima={myPenerimaRecord}
@@ -748,51 +511,7 @@ export function App() {
         />
       )}
 
-      {/* 6. Change Password Modal */}
-      {showChangePasswordModal && (
-        <ChangePasswordModal
-          currentUser={effectiveUser}
-          onClose={() => setShowChangePasswordModal(false)}
-          onSuccess={(msg) => showToast(msg)}
-        />
-      )}
-
-      {/* 6.1 Hospital Profile Customization Modal (Image 2) */}
-      {showHospitalProfileModal && (
-        <HospitalProfileModal
-          profile={hospitalProfile}
-          onClose={() => setShowHospitalProfileModal(false)}
-          onSave={async (updated) => {
-            setHospitalProfile(updated);
-            try {
-              await supabase.from('hospital_profile').upsert({
-                id: 'default',
-                hospital_name: updated.hospitalName,
-                subtitle: updated.subtitle,
-                hospital_type: updated.hospitalType,
-                badge_text: updated.badgeText,
-                badge_color: updated.badgeColor,
-                pemda_name: updated.pemdaName,
-                address: updated.address,
-                city: updated.city,
-                phone: updated.phone,
-                director_name: updated.directorName,
-                director_nip: updated.directorNip,
-                director_title: updated.directorTitle,
-                committee_lead_name: updated.committeeLeadName,
-                committee_lead_nip: updated.committeeLeadNip,
-                committee_lead_title: updated.committeeLeadTitle,
-                updated_at: new Date().toISOString()
-              });
-            } catch (err) {
-              console.warn("Could not upsert hospital_profile to Supabase:", err);
-            }
-            showToast('Profil dan identitas instansi berhasil diperbarui dan diselaraskan ke seluruh sistem!');
-          }}
-        />
-      )}
-
-      {/* 7. Notification Toast */}
+      {/* Notification Toast */}
       {toastMessage && (
         <div className="fixed bottom-20 sm:bottom-6 right-6 z-50 flex items-center space-x-2 bg-gradient-to-r from-[#172554] to-[#1e3a8a] border border-blue-400/50 text-white px-4 py-3 rounded-2xl shadow-2xl animate-fade-in text-xs font-bold">
           <Check className="w-4 h-4 text-amber-400" />
@@ -800,7 +519,7 @@ export function App() {
         </div>
       )}
 
-      {/* 8. Announcement Edit Modal */}
+      {/* Announcement Edit Modal */}
       {showAnnouncementEdit && effectiveUser?.role === 'superadmin' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl relative">
