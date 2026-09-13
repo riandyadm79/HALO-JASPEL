@@ -106,7 +106,16 @@ export const INITIAL_ALOKASI: AlokasiJaspel[] = [
 export const INITIAL_PENERIMA: PenerimaAlokasi[] = GENERAL_INDEX_CSV_DATA.map((item) => {
   const postRemun = item.jaspelPostRemunerasi || 0;
   const postBeban = item.postPenyesuaianBebanKerja || 0;
-  const bruto = item.jaspelPostTotal || (postRemun + postBeban) || 0;
+  // Initially we map Beban Kerja -> Beban Tetap, Post Remun -> Post Remunerasi
+  // Jasa Langsung and Administrasi are set to 0 initially for demo
+  const nominalBebanTetap = postBeban;
+  const nominalPostRemunerasi = postRemun;
+  const nominalAdministrasi = 0;
+  const nominalJasaLangsung = 0;
+  const potonganCuti = 0;
+  const nominalKoreksi = 0;
+
+  const bruto = nominalBebanTetap + nominalPostRemunerasi + nominalAdministrasi + nominalJasaLangsung - potonganCuti + nominalKoreksi;
 
   let pphPersen = 5;
   if (item.statusPegawai === 'Non-PNS' || (item.golongan && item.golongan.includes('II') && !item.golongan.includes('III'))) {
@@ -158,6 +167,14 @@ export const INITIAL_PENERIMA: PenerimaAlokasi[] = GENERAL_INDEX_CSV_DATA.map((i
     jaspelPostRemunerasi: postRemun,
     postPenyesuaianBebanKerja: postBeban,
     jaspelPostTotal: bruto,
+
+    nominalBebanTetap,
+    nominalPostRemunerasi,
+    nominalAdministrasi,
+    nominalJasaLangsung,
+    potonganCuti,
+    nominalKoreksi,
+
     persenAdministrasi: item.persenAdministrasi || '0,00%',
     kelompokJasa: item.kelompokJasa,
     kelompokRekap: item.kelompokRekap,

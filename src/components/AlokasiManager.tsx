@@ -809,15 +809,15 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
               <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-black tracking-wider border-b border-slate-800">
                 <tr>
                   <th className="py-3.5 px-4">Nama & Unit</th>
-                  <th className="py-3.5 px-3 text-center">Skor Total</th>
-                  <th className="py-3.5 px-3 text-right">Post Remunerasi</th>
-                  <th className="py-3.5 px-3 text-right">Beban Kerja</th>
-                  <th className="py-3.5 px-4 text-right font-extrabold text-amber-300">Bruto Total</th>
+                  <th className="py-3.5 px-3 text-center">Beban Tetap</th>
+                  <th className="py-3.5 px-3 text-right">Post Remun</th>
+                  <th className="py-3.5 px-3 text-right">Administrasi</th>
+                  <th className="py-3.5 px-3 text-right">Jasa Langsung</th>
+                  <th className="py-3.5 px-3 text-right text-rose-400">Pot. Cuti</th>
+                  <th className="py-3.5 px-3 text-right text-amber-300">Koreksi</th>
+                  <th className="py-3.5 px-4 text-right font-extrabold text-amber-300">JP Rekap (Bruto)</th>
                   <th className="py-3.5 px-3 text-right">PPh 21</th>
                   <th className="py-3.5 px-4 text-right font-bold text-white">Netto Diterima</th>
-                  <th className="py-3.5 px-3 text-center">Adm %</th>
-                  <th className="py-3.5 px-3 text-center">Koreksi</th>
-                  <th className="py-3.5 px-3 text-center">Pencairan</th>
                   <th className="py-3.5 px-3 text-center">Aksi</th>
                 </tr>
               </thead>
@@ -846,53 +846,32 @@ export const AlokasiManager: React.FC<AlokasiManagerProps> = ({
                         <div className="font-bold text-white text-xs sm:text-sm">{p.nama}</div>
                         <div className="text-[10px] text-slate-400">{p.unitKerja} • {p.jabatan}</div>
                       </td>
-                      <td className="py-3 px-3 text-center font-mono font-bold text-amber-400">
-                        {p.totalPoin}
+                      <td className="py-3 px-3 text-center font-mono text-slate-300">
+                        {formatRupiah(p.nominalBebanTetap || 0)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-slate-300">
-                        {formatRupiah(p.jaspelPostRemunerasi || 0)}
+                        {formatRupiah(p.nominalPostRemunerasi || 0)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-slate-300">
-                        {formatRupiah(p.postPenyesuaianBebanKerja || 0)}
+                        {formatRupiah(p.nominalAdministrasi || 0)}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-amber-400">
+                      <td className="py-3 px-3 text-right font-mono text-slate-300">
+                        {formatRupiah(p.nominalJasaLangsung || 0)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-rose-400">
+                        {p.potonganCuti ? `-${formatRupiah(p.potonganCuti)}` : '0'}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-amber-300">
+                        {p.nominalKoreksi && p.nominalKoreksi !== 0 ? formatRupiah(p.nominalKoreksi) : '0'}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-amber-400 bg-amber-400/5">
                         {formatRupiah(p.brutoJaspel)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-rose-400">
                         -{formatRupiah(p.potonganPph21)}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-black text-white text-xs sm:text-sm bg-amber-400/5">
+                      <td className="py-3 px-4 text-right font-mono font-black text-white text-xs sm:text-sm bg-emerald-400/5">
                         {formatRupiah(p.nettoDiterima)}
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="font-mono text-emerald-400 font-semibold">{p.persenAdministrasi || '0,00%'}</span>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <button
-                          onClick={() => handleQuickKoreksi(p)}
-                          title="Klik untuk rotasi status koreksi: Sesuai -> Usulan Koreksi -> Disetujui Koreksi"
-                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold transition hover:scale-105 cursor-pointer ${
-                            p.statusKoreksi === 'Sesuai' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
-                            p.statusKoreksi === 'Usulan Koreksi' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
-                            'bg-blue-950 text-blue-300 border border-blue-800'
-                          }`}
-                        >
-                          {p.statusKoreksi}
-                        </button>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <button
-                          onClick={() => handleTogglePayment(p)}
-                          title="Klik untuk mengubah status pencairan payroll"
-                          className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition cursor-pointer ${
-                            p.sudahDibayar 
-                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900' 
-                              : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-white'
-                          }`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${p.sudahDibayar ? 'bg-emerald-400' : 'bg-slate-500'}`} />
-                          <span>{p.sudahDibayar ? 'Lunas' : 'Tertunda'}</span>
-                        </button>
                       </td>
                       <td className="py-3 px-3 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center space-x-1">

@@ -374,8 +374,8 @@ export const DanaDistribusiManager: React.FC<DanaDistribusiManagerProps> = ({
             ))}
           </div>
 
-          {/* PILAR 1: BEBAN TETAP (Cost Center / Biaya Operasional Remunerasi) */}
-          {(filterKategori === 'all' || filterKategori === 'tetap') && (
+          {/* PILAR 1: COST CENTER (Beban Tetap & Beban Fluktuasi) */}
+          {(filterKategori === 'all' || filterKategori === 'tetap' || filterKategori === 'jtl') && (
             <div className="bg-slate-900/90 rounded-3xl border border-slate-800 shadow-xl overflow-hidden">
               
               {/* Header Accordion */}
@@ -389,22 +389,22 @@ export const DanaDistribusiManager: React.FC<DanaDistribusiManagerProps> = ({
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">
-                      <h3 className="text-base font-black text-white">1. Beban Tetap (Cost Center)</h3>
+                      <h3 className="text-base font-black text-white">1. Cost Center</h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                        {kalkulasi.bebanTetap.persenDariJaspel}% dari Pagu JP
+                        {(kalkulasi.bebanTetap.persenDariJaspel + kalkulasi.jasaTidakLangsung.persenDariJaspel).toFixed(2)}% dari Pagu JP
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Tim Perumus (1,5%), Penyesuaian Risiko & Beban Kerja Pengelola BLUD/Dewas (4,5%), dan MOU Keahlian
+                      Beban Tetap (Non Jasa) dan Jasa Tidak Langsung (Beban Fluktuasi)
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-3">
                   <div className="text-right hidden sm:block">
-                    <span className="text-[10px] font-bold uppercase text-slate-400">Total Alokasi Beban Tetap</span>
+                    <span className="text-[10px] font-bold uppercase text-slate-400">Total Alokasi Cost Center</span>
                     <p className="text-sm sm:text-base font-black text-amber-400 font-mono">
-                      {formatRupiah(kalkulasi.bebanTetap.totalBebanTetap)}
+                      {formatRupiah(kalkulasi.bebanTetap.totalBebanTetap + kalkulasi.jasaTidakLangsung.totalJTL)}
                     </p>
                   </div>
                   {expandedSection.tetap ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
@@ -413,40 +413,84 @@ export const DanaDistribusiManager: React.FC<DanaDistribusiManagerProps> = ({
 
               {/* Body */}
               {expandedSection.tetap && (
-                <div className="p-4 sm:p-6 space-y-4">
+                <div className="p-4 sm:p-6 space-y-8">
                   
-                  {/* Highlight Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
-                      <span className="text-[10px] font-bold uppercase text-blue-300">Tim Perumus Jaspel</span>
-                      <p className="text-base font-black text-white font-mono mt-1">
-                        {formatRupiah(kalkulasi.bebanTetap.timPerumus.nominal)}
-                      </p>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                        <span>Porsi: 1,5%</span>
-                        <span>{kalkulasi.bebanTetap.timPerumus.personel} Staf (@ {formatRupiah(kalkulasi.bebanTetap.timPerumus.rataRata)})</span>
-                      </div>
+                  {/* A. Non Jasa (Beban Tetap) */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col">
+                      <h4 className="text-sm font-bold text-white uppercase tracking-wider">A. Non Jasa (Beban Tetap)</h4>
+                      <p className="text-xs text-slate-400">Alokasi: {kalkulasi.bebanTetap.persenDariJaspel}% ({formatRupiah(kalkulasi.bebanTetap.totalBebanTetap)})</p>
                     </div>
 
-                    <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
-                      <span className="text-[10px] font-bold uppercase text-blue-300">Penyesuaian Risiko, Kepatutan & Beban Kerja</span>
-                      <p className="text-base font-black text-amber-400 font-mono mt-1">
-                        {formatRupiah(kalkulasi.bebanTetap.penyesuaianRisiko.nominal)}
-                      </p>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                        <span>Porsi: 4,5%</span>
-                        <span>Pengelola BLUD & Dewan Pengawas</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+                        <span className="text-[10px] font-bold uppercase text-blue-300">1) Tim Perumus</span>
+                        <p className="text-base font-black text-white font-mono mt-1">
+                          {formatRupiah(kalkulasi.bebanTetap.timPerumus.nominal)}
+                        </p>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                          <span>{kalkulasi.bebanTetap.timPerumus.personel} Staf</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+                        <span className="text-[10px] font-bold uppercase text-blue-300">2) Pengelola BLUD</span>
+                        <p className="text-base font-black text-amber-400 font-mono mt-1">
+                          {formatRupiah(kalkulasi.bebanTetap.penyesuaianRisiko.nominal - 7107593)} {/* Approximate Dewas deduction */}
+                        </p>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                          <span>4 Pejabat</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+                        <span className="text-[10px] font-bold uppercase text-blue-300">3) Dewan Pengawas</span>
+                        <p className="text-base font-black text-emerald-400 font-mono mt-1">
+                          {formatRupiah(7107593)}
+                        </p>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                          <span>3 Personel</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+                        <span className="text-[10px] font-bold uppercase text-blue-300">4) Tugas Tambahan</span>
+                        <p className="text-base font-black text-white font-mono mt-1">
+                          Rp 0
+                        </p>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                          <span>Belum ada kegiatan</span>
+                        </div>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
-                      <span className="text-[10px] font-bold uppercase text-blue-300">Proporsi Keahlian & Profesi MOU</span>
-                      <p className="text-base font-black text-emerald-400 font-mono mt-1">
-                        {formatRupiah(kalkulasi.bebanTetap.mouKeahlian)}
-                      </p>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                        <span>Beban Khusus</span>
-                        <span>1 Ahli Spesialis MOU</span>
+                  {/* B. Jasa Tidak Langsung (Beban Fluktuasi) */}
+                  <div className="space-y-4 pt-4 border-t border-slate-800/60">
+                    <div className="flex flex-col">
+                      <h4 className="text-sm font-bold text-white uppercase tracking-wider">B. Jasa Tidak Langsung (Beban Fluktuasi)</h4>
+                      <p className="text-xs text-slate-400">Alokasi: {kalkulasi.jasaTidakLangsung.persenDariJaspel}% ({formatRupiah(kalkulasi.jasaTidakLangsung.totalJTL)})</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+                        <span className="text-[10px] font-bold uppercase text-blue-300">1) Post Remunerasi (General Index)</span>
+                        <p className="text-base font-black text-white font-mono mt-1">
+                          {formatRupiah(kalkulasi.jasaTidakLangsung.postRemunerasi.nominal + kalkulasi.jasaTidakLangsung.struktural.total)}
+                        </p>
+                        <div className="text-[11px] text-slate-400 mt-1">
+                          Rupiah bagi seluruh Pegawai
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+                        <span className="text-[10px] font-bold uppercase text-blue-300">2) Administrasi</span>
+                        <p className="text-base font-black text-amber-400 font-mono mt-1">
+                          {formatRupiah(kalkulasi.jasaTidakLangsung.administrasi.nominal)}
+                        </p>
+                        <div className="text-[11px] text-slate-400 mt-1">
+                          Rupiah Hanya untuk kelompok administrasi
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -535,112 +579,7 @@ export const DanaDistribusiManager: React.FC<DanaDistribusiManagerProps> = ({
             </div>
           )}
 
-          {/* PILAR 2: JASA TIDAK LANGSUNG (Cost Center / Beban Fluktuasi) */}
-          {(filterKategori === 'all' || filterKategori === 'jtl') && (
-            <div className="bg-slate-900/90 rounded-3xl border border-slate-800 shadow-xl overflow-hidden">
-              
-              <div 
-                onClick={() => toggleSection('jtl')}
-                className="p-4 sm:p-5 bg-gradient-to-r from-[#172554]/50 to-slate-900/90 flex items-center justify-between cursor-pointer hover:bg-blue-950/40 transition border-b border-slate-800"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="p-2.5 rounded-2xl bg-blue-950 text-blue-400 border border-blue-800">
-                    <Briefcase className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h3 className="text-base font-black text-white">2. Jasa Tidak Langsung (Cost Center)</h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">
-                        {kalkulasi.jasaTidakLangsung.persenDariJaspel}% dari Pagu JP
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Struktural (24,4%), Administrasi (16,3%), Post Remunerasi (59,3%), dan Tugas Tambahan
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <div className="text-right hidden sm:block">
-                    <span className="text-[10px] font-bold uppercase text-slate-400">Total Jasa Tidak Langsung</span>
-                    <p className="text-sm sm:text-base font-black text-blue-400 font-mono">
-                      {formatRupiah(kalkulasi.jasaTidakLangsung.totalJTL)}
-                    </p>
-                  </div>
-                  {expandedSection.jtl ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
-              </div>
-
-              {expandedSection.jtl && (
-                <div className="p-4 sm:p-6 space-y-4">
-                  
-                  {/* Pos Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
-                      <span className="text-[10px] font-bold uppercase text-blue-300">Struktural Manajemen</span>
-                      <p className="text-base font-black text-white font-mono mt-1">
-                        {formatRupiah(kalkulasi.jasaTidakLangsung.struktural.total)}
-                      </p>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                        <span>Porsi: 24,4%</span>
-                        <span>{kalkulasi.jasaTidakLangsung.struktural.personel} Pejabat</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
-                      <span className="text-[10px] font-bold uppercase text-blue-300">Administrasi & Penunjang Non-Klinis</span>
-                      <p className="text-base font-black text-white font-mono mt-1">
-                        {formatRupiah(kalkulasi.jasaTidakLangsung.administrasi.nominal)}
-                      </p>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                        <span>Porsi: 16,3%</span>
-                        <span>{kalkulasi.jasaTidakLangsung.administrasi.personel} Staf (@ {formatRupiah(kalkulasi.jasaTidakLangsung.administrasi.rataRata)})</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
-                      <span className="text-[10px] font-bold uppercase text-blue-300">Post Remunerasi (General Index)</span>
-                      <p className="text-base font-black text-amber-400 font-mono mt-1">
-                        {formatRupiah(kalkulasi.jasaTidakLangsung.postRemunerasi.nominal)}
-                      </p>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                        <span>Porsi: 59,3%</span>
-                        <span>{kalkulasi.jasaTidakLangsung.postRemunerasi.personel} Staf (@ {formatRupiah(kalkulasi.jasaTidakLangsung.postRemunerasi.rataRata)})</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Detail Struktural Table */}
-                  <div className="overflow-x-auto rounded-2xl border border-slate-800">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-950 text-slate-400 uppercase font-bold text-[10px] tracking-wider">
-                        <tr>
-                          <th className="py-2.5 px-3">Jabatan Struktural</th>
-                          <th className="py-2.5 px-3 text-right">Alokasi Rupiah</th>
-                          <th className="py-2.5 px-3 text-center">Personel</th>
-                          <th className="py-2.5 px-3 text-right">Rata-rata / Pejabat</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {kalkulasi.jasaTidakLangsung.struktural.items.map((row, idx) => (
-                          <tr key={idx} className="hover:bg-slate-800/40">
-                            <td className="py-2 px-3 font-semibold text-white">{row.jabatan}</td>
-                            <td className="py-2 px-3 text-right font-mono text-white font-bold">{formatRupiah(row.nominal)}</td>
-                            <td className="py-2 px-3 text-center font-mono text-slate-300">{row.personel}</td>
-                            <td className="py-2 px-3 text-right font-mono text-blue-300">{formatRupiah(row.rataRata)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* PILAR 3: JASA LANGSUNG (Revenue Center / Layanan Klinis) */}
+          {/* PILAR 2: JASA LANGSUNG (Revenue Center) */}
           {(filterKategori === 'all' || filterKategori === 'jl') && (
             <div className="bg-slate-900/90 rounded-3xl border border-slate-800 shadow-xl overflow-hidden">
               
@@ -654,13 +593,13 @@ export const DanaDistribusiManager: React.FC<DanaDistribusiManagerProps> = ({
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">
-                      <h3 className="text-base font-black text-white">3. Jasa Langsung (Revenue Center)</h3>
+                      <h3 className="text-base font-black text-white">2. Revenue Center (Jasa Langsung)</h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                         {kalkulasi.jasaLangsung.persenDariJaspel}% dari Pagu JP
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Perawat (40,9%), Dokter/Medis (43,0%), dan Nakes Lainnya (16,1% dengan 10 Profesi Penunjang)
+                      Perawat, Medis (Dokter Umum, Spesialis, Psikiater), dan Nakes Lain (Tarif & Non-Tarif)
                     </p>
                   </div>
                 </div>

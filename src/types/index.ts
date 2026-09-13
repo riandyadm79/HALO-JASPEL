@@ -120,6 +120,15 @@ export interface PenerimaAlokasi {
   jaspelPostRemunerasi?: number;
   postPenyesuaianBebanKerja?: number;
   jaspelPostTotal?: number;
+  
+  // New Hierarchical Fields
+  nominalBebanTetap?: number;
+  nominalPostRemunerasi?: number;
+  nominalAdministrasi?: number;
+  nominalJasaLangsung?: number;
+  potonganCuti?: number;
+  nominalKoreksi?: number;
+
   persenAdministrasi?: string;
   kelompokJasa?: string;
   kelompokRekap?: string;

@@ -138,6 +138,59 @@ CREATE TABLE IF NOT EXISTS public.indeks_jasa_langsung (
   created_at timestamptz DEFAULT now()
 );
 
+-- 4. TABEL PENERIMA ALOKASI JASPEL (RINCIAN 2 PILAR TERKINI)
+CREATE TABLE IF NOT EXISTS public.penerima_alokasi (
+  id text PRIMARY KEY,
+  alokasi_id text,
+  pegawai_id text,
+  nama text NOT NULL,
+  unit_kerja text,
+  jabatan text,
+  kategori text DEFAULT 'Medis',
+  poin_dasar numeric DEFAULT 0,
+  poin_kompetensi numeric DEFAULT 0,
+  poin_risiko numeric DEFAULT 0,
+  poin_kinerja numeric DEFAULT 0,
+  total_poin numeric DEFAULT 0,
+  nilai_per_poin numeric DEFAULT 0,
+  nominal_beban_tetap numeric DEFAULT 0,
+  nominal_post_remunerasi numeric DEFAULT 0,
+  nominal_administrasi numeric DEFAULT 0,
+  nominal_jasa_langsung numeric DEFAULT 0,
+  potongan_cuti numeric DEFAULT 0,
+  nominal_koreksi numeric DEFAULT 0,
+  bruto_jaspel numeric DEFAULT 0,
+  pajak_pph21_persen numeric DEFAULT 0,
+  potongan_pph21 numeric DEFAULT 0,
+  netto_diterima numeric DEFAULT 0,
+  total_diterima numeric DEFAULT 0,
+  status_koreksi text DEFAULT 'Sesuai',
+  catatan_koreksi text,
+  sudah_dibayar boolean DEFAULT false,
+  updated_at timestamptz DEFAULT now()
+);
+
+-- 5. TABEL GENERAL INDEX PEGAWAI
+CREATE TABLE IF NOT EXISTS public.general_index (
+  id text PRIMARY KEY,
+  kode text NOT NULL,
+  nama_pegawai text NOT NULL,
+  golongan text,
+  jabatan text,
+  pendidikan text,
+  masa_kerja_tahun numeric DEFAULT 0,
+  ruangan text,
+  kelompok_jasa text,
+  skor_dasar numeric DEFAULT 0,
+  skor_kompetensi numeric DEFAULT 0,
+  skor_risiko numeric DEFAULT 0,
+  skor_kinerja numeric DEFAULT 0,
+  bobot_presensi numeric DEFAULT 100,
+  jaspel_post_total numeric DEFAULT 0,
+  status_pegawai text DEFAULT 'PNS',
+  created_at timestamptz DEFAULT now()
+);
+
 -- KEBIJAKAN AKSES ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.unit_kinerja_layanan ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Akses Publik unit_kinerja_layanan" ON public.unit_kinerja_layanan;
@@ -150,6 +203,14 @@ CREATE POLICY "Akses Publik pegawai_kinerja_layanan" ON public.pegawai_kinerja_l
 ALTER TABLE public.indeks_jasa_langsung ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Akses Publik indeks_jasa_langsung" ON public.indeks_jasa_langsung;
 CREATE POLICY "Akses Publik indeks_jasa_langsung" ON public.indeks_jasa_langsung FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE public.penerima_alokasi ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Akses Publik penerima_alokasi" ON public.penerima_alokasi;
+CREATE POLICY "Akses Publik penerima_alokasi" ON public.penerima_alokasi FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE public.general_index ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Akses Publik general_index" ON public.general_index;
+CREATE POLICY "Akses Publik general_index" ON public.general_index FOR ALL USING (true) WITH CHECK (true);
 `;
 
   const fetchTableStats = async () => {
