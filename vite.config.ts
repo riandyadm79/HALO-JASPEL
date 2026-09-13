@@ -69,6 +69,16 @@ export default defineConfig(() => {
   return {
     base: './',
     plugins: [react(), tailwindcss(), viteSingleFile(), aistudioMediaPlugin()],
+    build: {
+      assetsInlineLimit: 100_000_000,
+      copyPublicDir: false,
+      cssCodeSplit: false,
+      rollupOptions: {
+        output: {
+          inlineDynamicImports: true,
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
