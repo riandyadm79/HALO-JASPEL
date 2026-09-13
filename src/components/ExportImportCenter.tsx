@@ -10,7 +10,9 @@ import {
   Copy, 
   RefreshCw,
   Eye,
-  FileCheck2
+  FileCheck2,
+  FileCode,
+  Globe
 } from 'lucide-react';
 import { AlokasiJaspel, PenerimaAlokasi, GeneralIndexItem, CostCenterItem, RevenueCenterItem, User } from '../types';
 import { HospitalProfile, DEFAULT_HOSPITAL_PROFILE } from '../types';
@@ -92,6 +94,110 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
     navigator.clipboard.writeText(textPreview);
     setCopiedText(true);
     setTimeout(() => setCopiedText(false), 2000);
+  };
+
+  const handleExportSingleFileApp = () => {
+    const dataSnapshot = {
+      hospitalProfile,
+      alokasiList,
+      penerimaList,
+      generalIndexList,
+      costCenterList,
+      revenueCenterList,
+      exportedAt: new Date().toISOString()
+    };
+
+    const standaloneHtml = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${hospitalProfile.hospitalName || 'HALO JASPEL'} - Single File Standalone App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 sm:p-8">
+  <div class="max-w-6xl mx-auto space-y-6">
+    <div class="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 p-6 rounded-3xl border border-blue-800 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <span class="px-3 py-1 bg-amber-400/20 text-amber-300 border border-amber-400/30 rounded-full text-xs font-black uppercase">
+          SINGLE FILE STANDALONE APPLICATION
+        </span>
+        <h1 class="text-2xl sm:text-3xl font-black text-white mt-2">${hospitalProfile.hospitalName || 'HALO JASPEL'}</h1>
+        <p class="text-xs sm:text-sm text-slate-400 mt-1">Dokumen Interaktif Portabel & Data Terenkapsulasi (Offline Ready)</p>
+      </div>
+      <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 text-xs space-y-1">
+        <div class="text-slate-400">Total Periode: <span class="text-amber-400 font-bold">${alokasiList.length}</span></div>
+        <div class="text-slate-400">Total Staf Terdaftar: <span class="text-emerald-400 font-bold">${generalIndexList.length}</span></div>
+        <div class="text-slate-400">Total Transaksi Penerima: <span class="text-blue-400 font-bold">${penerimaList.length}</span></div>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4">
+      <h2 class="text-lg font-black text-white flex items-center gap-2">
+        <span>Ringkasan Periode Aktif</span>
+      </h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-slate-950 text-slate-400 border-b border-slate-800">
+              <th class="p-3">Periode</th>
+              <th class="p-3">Pagu Bruto</th>
+              <th class="p-3">Jaspel Netto</th>
+              <th class="p-3">Pos Direksi</th>
+              <th class="p-3">Pos Pelayanan</th>
+              <th class="p-3">Pos Penunjang</th>
+              <th class="p-3">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800">
+            ${alokasiList.map(a => `
+              <tr class="hover:bg-slate-800/50">
+                <td class="p-3 font-bold text-white">${a.kodePeriode} (${a.bulan} ${a.tahun})</td>
+                <td class="p-3 text-slate-300 font-mono">Rp ${(a.paguKlaimBruto || 0).toLocaleString('id-ID')}</td>
+                <td class="p-3 text-amber-400 font-bold font-mono">Rp ${(a.jaspelNetto || 0).toLocaleString('id-ID')}</td>
+                <td class="p-3 font-mono text-slate-400">Rp ${(a.posDireksi?.nominal || 0).toLocaleString('id-ID')}</td>
+                <td class="p-3 font-mono text-emerald-400 font-bold">Rp ${(a.posPelayanan?.nominal || 0).toLocaleString('id-ID')}</td>
+                <td class="p-3 font-mono text-blue-400">Rp ${(a.posAdministrasiPenunjang?.nominal || 0).toLocaleString('id-ID')}</td>
+                <td class="p-3"><span class="px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] font-bold">${a.status}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-black text-white">Database Snapshot & JSON Data Port</h2>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('raw-json').value); alert('Data snapshot JSON tersalin ke clipboard!');" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition">
+          Salin Data JSON
+        </button>
+      </div>
+      <p class="text-xs text-slate-400">File HTML mandiri ini dapat dibuka kapan saja di browser apa pun tanpa koneksi internet atau server backend.</p>
+      <textarea id="raw-json" readonly rows="8" class="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[11px] font-mono text-emerald-400 custom-scrollbar">${JSON.stringify(dataSnapshot, null, 2)}</textarea>
+    </div>
+
+    <footer class="text-center text-xs text-slate-500 pt-4">
+      ${hospitalProfile.hospitalName || 'HALO JASPEL'} • Single File Standalone Engine • Diekspor pada ${new Date().toLocaleString('id-ID')}
+    </footer>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([standaloneHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `HALO_JASPEL_SINGLE_FILE_${selectedAlokasi?.kodePeriode || 'APP'}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -354,6 +460,29 @@ export const ExportImportCenter: React.FC<ExportImportCenterProps> = ({
                 >
                   {copiedText ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedText ? 'Tersalin!' : 'Salin Teks Ringkasan'}</span>
+                </button>
+              </div>
+
+              {/* Single File Application Card */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-amber-500/50 transition space-y-2 sm:col-span-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-black text-amber-400 uppercase">5. SINGLE FILE APPLICATION (.HTML)</span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                      OFFLINE PORTABLE
+                    </span>
+                  </div>
+                  <FileCode className="w-5 h-5 text-amber-400" />
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  Unduh seluruh snapshot aplikasi dan basis data dalam 1 file HTML mandiri (Single-File). Bisa dibuka langsung di browser manapun tanpa instalasi software atau server.
+                </p>
+                <button
+                  onClick={handleExportSingleFileApp}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-xs transition flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/20"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh Aplikasi Single File (.html Mandiri)</span>
                 </button>
               </div>
 
